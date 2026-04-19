@@ -96,12 +96,7 @@ end)
 local Dehash = {}
 
 function Dehash:GetRemote(name)
-	local remote = Remotes[name]
-	if not remote then
-		warn("[Dehash] GetRemote: no remote found with name:", name)
-		return nil
-	end
-	return remote
+	return Remotes[name] or nil
 end
 
 function Dehash:FireRemote(name, ...)
@@ -119,13 +114,9 @@ end
 
 function Dehash:GetRemotes()
 	local copy = {}
-	local count = 0
 	for name, remote in pairs(Remotes) do
 		copy[name] = remote
-		count += 1
-		print(string.format("[%s] %s\n ↳ %s", remote.ClassName, name, remote:GetFullName()))
 	end
-	print(string.format("Total: %d remote(s) mapped", count))
 	return copy
 end
 
