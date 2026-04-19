@@ -6,8 +6,6 @@ if game.PlaceId ~= 10277635599 then
 end
 getgenv().__MituRemoteMapper = true
 
--- ── Internals ─────────────────────────────────────────────────────────────────
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteMap = {}
 local Remotes   = {}
@@ -88,8 +86,6 @@ task.spawn(function()
 		scanGC()
 	end
 end)
-
--- ── Dehash Library ────────────────────────────────────────────────────────────
 
 local Dehash = {}
 
