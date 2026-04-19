@@ -1,9 +1,7 @@
 if getgenv().__MituRemoteMapper then
-	warn("[Mitu] Dehash is already running. Ignoring re-execution.")
 	return getgenv().Dehash
 end
 if game.PlaceId ~= 10277635599 then
-	warn("[Mitu] Dehash only runs on PlaceId 10277635599. Not:", game.PlaceId)
 	return
 end
 getgenv().__MituRemoteMapper = true
@@ -102,7 +100,6 @@ end
 function Dehash:FireRemote(name, ...)
 	local remote = Remotes[name]
 	if not remote then
-		warn("[Dehash] FireRemote: no remote found with name:", name)
 		return
 	end
 	if remote:IsA("RemoteEvent") then
@@ -121,5 +118,4 @@ function Dehash:GetRemotes()
 end
 
 getgenv().Dehash = Dehash
-print("[Mitu] Dehash loaded.")
 return Dehash
