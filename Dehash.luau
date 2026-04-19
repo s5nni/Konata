@@ -103,4 +103,4 @@ getgenv().GetRemotes = function()
 	print(string.format("Total: %d remote(s) mapped", count))
 end
 
-print("[Mitu] Remote Mapper loaded. Call getgenv().GetRemotes() to list all mapped remotes.")
+print("[Mitu] Remote Mapper loaded. Call getgenv().Remotes to view the table. | getgenv().GetRemotes() to list all mapped remotes.")
