@@ -1,25 +1,25 @@
 if getgenv().__MituRemoteMapper then
-	warn("[Mitu] Remote Mapper is already running. Ignoring re-execution.")
-	return
+	warn("[Mitu] Dehash is already running. Ignoring re-execution.")
+	return getgenv().Dehash
 end
-
 if game.PlaceId ~= 10277635599 then
-	warn("[Mitu] Remote Mapper only runs on PlaceId 10277635599. Not:", game.PlaceId)
+	warn("[Mitu] Dehash only runs on PlaceId 10277635599. Not:", game.PlaceId)
 	return
 end
-
 getgenv().__MituRemoteMapper = true
+
+-- ── Internals ─────────────────────────────────────────────────────────────────
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteMap = {}
-getgenv().Remotes = {}
+local Remotes   = {}
 
 local function register(remote, realName)
 	if not (remote and remote.Parent) then return end
 	if typeof(remote) ~= "Instance" then return end
 	if type(realName) ~= "string" or realName == "" then return end
 	RemoteMap[remote] = realName
-	getgenv().Remotes[realName] = remote
+	Remotes[realName] = remote
 end
 
 local function scanGC()
@@ -91,16 +91,44 @@ task.spawn(function()
 	end
 end)
 
-getgenv().GetRemotes = function()
-	local list = getgenv().Remotes
-	local count = 0
-	for name, remote in pairs(list) do
-		count += 1
-		local remoteType = remote.ClassName
-		local path = remote:GetFullName()
-		print(string.format("[%s] %s\n ↳ %s", remoteType, name, path))
+-- ── Dehash Library ────────────────────────────────────────────────────────────
+
+local Dehash = {}
+
+function Dehash:GetRemote(name)
+	local remote = Remotes[name]
+	if not remote then
+		warn("[Dehash] GetRemote: no remote found with name:", name)
+		return nil
 	end
-	print(string.format("Total: %d remote(s) mapped", count))
+	return remote
 end
 
-print("[Mitu] Remote Mapper loaded. Call getgenv().Remotes to view the table. | getgenv().GetRemotes() to list all mapped remotes.")
+function Dehash:FireRemote(name, ...)
+	local remote = Remotes[name]
+	if not remote then
+		warn("[Dehash] FireRemote: no remote found with name:", name)
+		return
+	end
+	if remote:IsA("RemoteEvent") then
+		remote:FireServer(...)
+	elseif remote:IsA("RemoteFunction") then
+		return remote:InvokeServer(...)
+	end
+end
+
+function Dehash:GetRemotes()
+	local copy = {}
+	local count = 0
+	for name, remote in pairs(Remotes) do
+		copy[name] = remote
+		count += 1
+		print(string.format("[%s] %s\n ↳ %s", remote.ClassName, name, remote:GetFullName()))
+	end
+	print(string.format("Total: %d remote(s) mapped", count))
+	return copy
+end
+
+getgenv().Dehash = Dehash
+print("[Mitu] Dehash loaded.")
+return Dehash
