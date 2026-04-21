@@ -1,23 +1,29 @@
 local Library = {}
 local HttpService = game:GetService("HttpService")
 
--- Optional: Check for executor's request function
-local request = syn and syn.request or request or nil
 if not request then
 	warn("[Library] 'request' function not found — ensure you're using a compatible executor")
 end
+
+Library.Configuration = {
+	Url = "",
+	Secret = "",
+}
 
 function Library:decodeJson(raw)
 	local ok, result = pcall(HttpService.JSONDecode, HttpService, raw)
 	return ok and result or nil
 end
 
--- Internal request helper
 function Library:_request(method, path, data)
-	local config = Configuration and Configuration.Initialize.FireBase
-	if not config then
-		warn("[Library] Firebase configuration missing")
-		return nil
+	local config = self.Configuration or {}
+	if config.Url == "" or config.Secret == "" then
+		if Configuration and Configuration.Initialize and Configuration.Initialize.FireBase then
+			config = Configuration.Initialize.FireBase
+		else
+			warn("[Library] Firebase configuration missing, set Library.Configuration.Url and .Secret")
+			return nil
+		end
 	end
 
 	local url = config.Url .. path .. ".json?auth=" .. config.Secret
@@ -51,23 +57,20 @@ function Library:_request(method, path, data)
 		return true
 	end
 
-	warn(string.format("[Library] Firebase %s failed — HTTP %d", method, response and response.StatusCode or 0))
+	warn(string.format("[Library] Firebase %s failed, HTTP %d", method, response and response.StatusCode or 0))
 	return nil
 end
 
--- GET data from a Firebase path
 function Library:Get(path)
 	assert(type(path) == "string", "path must be a string")
 	return Library:_request("GET", path)
 end
 
--- SET (overwrite) data at a Firebase path
 function Library:Set(path, data)
 	assert(type(path) == "string", "path must be a string")
 	return Library:_request("PUT", path, data)
 end
 
--- Optional: PATCH (update) and POST (push)
 function Library:Patch(path, data)
 	assert(type(path) == "string", "path must be a string")
 	return Library:_request("PATCH", path, data)
