@@ -1,6 +1,5 @@
 local Attempts = 0
 repeat Attempts = Attempts + 1; wait(1); until getgenv().__Mitulib.Authorized == true
-getgenv().__Mitulib.Authorized = nil
 
 local main_Dehash = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Dehash.luau"))()
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
