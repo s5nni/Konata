@@ -12,8 +12,6 @@ local RoomControl = game:GetService("ReplicatedStorage")
 	:WaitForChild("Events")
 	:WaitForChild("RoomControl")
 
--- ── Levels ───────────────────────────────────────────────────────────────────
-
 local Levels = {
 	Chapters = {
 		[1] = {
@@ -118,29 +116,25 @@ local function checkRoom()
 	return true
 end
 
--- ── Tabs / Sections ──────────────────────────────────────────────────────────
-
 local Tabs = {
 	Room     = Window:AddTab("Room",     { default = true }),
 	Settings = Window:AddTab("Settings", { default = false }),
 }
 
 local Sections = {
-	Setup   = Tabs.Room:AddSection("Setup",   { default = true }),
-	Control = Tabs.Room:AddSection("Control", { default = true }),
+	Setup   = Tabs.Room:AddSection("Setup",   { default = false }),
+	Control = Tabs.Room:AddSection("Control", { default = false }),
+	Account = Tabs.Settings:AddSection("Account", { default = false }),
 }
 
 local SubSections = {
-	Options = Sections.Setup:AddSubSection("Options",  { default = true }),
-	Actions = Sections.Control:AddSubSection("Actions", { default = true }),
+	Options = Sections.Setup:AddSubSection("Options",  { default = false }),
+	Actions = Sections.Control:AddSubSection("Actions", { default = false }),
 }
-
--- ── Setup ────────────────────────────────────────────────────────────────────
 
 local ch1Names = getLevelNames(1)
 Config.Room.Level = Levels.Chapters[1][ch1Names[1]]
 
--- Chapter
 SubSections.Options:AddDropdown("Chapter", { "Chapter 1", "Chapter 2" }, { multi = false, default = "Chapter 1" }, function(val)
 	Config.Room.Chapter = val == "Chapter 1" and 1 or 2
 	local names = getLevelNames(Config.Room.Chapter)
@@ -151,7 +145,6 @@ SubSections.Options:AddDropdown("Chapter", { "Chapter 1", "Chapter 2" }, { multi
 	end
 end)
 
--- Level
 Config.State.LevelDrop = SubSections.Options:AddDropdown("Level", ch1Names, { multi = false, default = ch1Names[1] }, function(val)
 	local levelNum = Levels.Chapters[Config.Room.Chapter][val]
 	if levelNum ~= nil then
@@ -159,17 +152,14 @@ Config.State.LevelDrop = SubSections.Options:AddDropdown("Level", ch1Names, { mu
 	end
 end)
 
--- GameMode
 SubSections.Options:AddDropdown("GameMode", { "Easy", "Normal", "Hard", "Nightmare" }, { multi = false, default = "Easy" }, function(val)
 	Config.Room.GameMode = ({ Easy = 1, Normal = 2, Hard = 3, Nightmare = 4 })[val]
 end)
 
--- Max Players
-SubSections.Options:AddDropdown("Max Players", { "1", "2", "3", "4" }, { multi = false, default = "1" }, function(val)
+SubSections.Options:AddDropdown("Max Players (5-10 Gamepass)", { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}, { multi = false, default = "1" }, function(val)
 	Config.Room.MaxSize = tonumber(val)
 end)
 
--- Toggles
 SubSections.Options:AddToggle("Friends Only",        { default = false }, function(val) Config.Room.Locked       = val end)
 SubSections.Options:AddToggle("IsTestPlace",         { default = false }, function(val) Config.Room.IsTestPlace  = val end)
 SubSections.Options:AddToggle("IsPre-PublishPlace",  { default = false }, function(val) Config.Room.IsPrePublish = val end)
@@ -207,69 +197,6 @@ SubSections.Actions:AddButton("Start Room", function()
 	end)
 	setStatus(ok and "Game Started." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
 	if not ok then warn("[Mitu] StartGame:", err) end
-end)
-
---[[
-    Add this after the existing Tabs/Sections setup in Apeirophobia_Lobby.luau
-    Example location: after line 47 where Tabs.Settings is defined.
---]]
-
--- 1. Create the Account section within the Settings tab
-local AccountSection = Tabs.Settings:AddSection("Account")
-
--- 2. Fetch the latest agent data from Firebase
---    (agentData is already available from the launcher's global scope)
-local currentAgentData = agentData or {}
-
--- 3. Helper function to safely get nested table values
-local function getNestedValue(tbl, ...)
-    local current = tbl
-    for _, key in ipairs({...}) do
-        if type(current) ~= "table" then return nil end
-        current = current[key]
-    end
-    return current
-end
-
--- 4. Display Premium Status
-local premiumStatus = getNestedValue(currentAgentData, "Account", "Premium")
-local premiumText = "None"
-if premiumStatus and premiumStatus.Activated and (premiumStatus.Duration or 0) > 0 then
-    local pType = premiumStatus.Type or "Unknown"
-    local pDur = premiumStatus.Duration or 0
-    premiumText = pType == "Lifetime" and "Lifetime" or string.format("%dh %dm remaining", math.floor(pDur/3600), math.floor((pDur%3600)/60))
-end
-AccountSection:AddLabel("Premium: " .. premiumText)
-
--- 5. Display Ban Status
-local isBanned = getNestedValue(currentAgentData, "Account", "Settings", "IsBanned") or false
-AccountSection:AddLabel("Banned: " .. (isBanned and "Yes" or "No"))
-
--- 6. Display Linked Discord (if any)
-local discordTag = getNestedValue(currentAgentData, "Account", "Settings", "Discord")
-if discordTag then
-    AccountSection:AddLabel("Discord: " .. discordTag)
-else
-    AccountSection:AddLabel("Discord: Not linked")
-end
-
--- 7. Display Number of Authorized Sessions
-local authCount = 0
-if currentAgentData.Authorizations then
-    for _ in pairs(currentAgentData.Authorizations) do authCount = authCount + 1 end
-end
-AccountSection:AddLabel("Active Sessions: " .. tostring(authCount))
-
--- 8. Clipboard button to copy HWID
-AccountSection:AddClipboardLabel("Copy HWID", function()
-    local hwid = gethwid()
-    setclipboard(hwid)
-    getgenv().__Mitulib.Source:Notify({
-        title   = "Account",
-        text    = "HWID copied to clipboard!",
-        color   = Color3.fromRGB(80, 125, 215),
-        duration = 3,
-    })
 end)
 
 Window.Frame.Topbar.Konata.Visible = true
