@@ -209,7 +209,68 @@ SubSections.Actions:AddButton("Start Room", function()
 	if not ok then warn("[Mitu] StartGame:", err) end
 end)
 
--- ── Finish ───────────────────────────────────────────────────────────────────
+--[[
+    Add this after the existing Tabs/Sections setup in Apeirophobia_Lobby.luau
+    Example location: after line 47 where Tabs.Settings is defined.
+--]]
+
+-- 1. Create the Account section within the Settings tab
+local AccountSection = Tabs.Settings:AddSection("Account")
+
+-- 2. Fetch the latest agent data from Firebase
+--    (agentData is already available from the launcher's global scope)
+local currentAgentData = agentData or {}
+
+-- 3. Helper function to safely get nested table values
+local function getNestedValue(tbl, ...)
+    local current = tbl
+    for _, key in ipairs({...}) do
+        if type(current) ~= "table" then return nil end
+        current = current[key]
+    end
+    return current
+end
+
+-- 4. Display Premium Status
+local premiumStatus = getNestedValue(currentAgentData, "Account", "Premium")
+local premiumText = "None"
+if premiumStatus and premiumStatus.Activated and (premiumStatus.Duration or 0) > 0 then
+    local pType = premiumStatus.Type or "Unknown"
+    local pDur = premiumStatus.Duration or 0
+    premiumText = pType == "Lifetime" and "Lifetime" or string.format("%dh %dm remaining", math.floor(pDur/3600), math.floor((pDur%3600)/60))
+end
+AccountSection:AddLabel("Premium: " .. premiumText)
+
+-- 5. Display Ban Status
+local isBanned = getNestedValue(currentAgentData, "Account", "Settings", "IsBanned") or false
+AccountSection:AddLabel("Banned: " .. (isBanned and "Yes" or "No"))
+
+-- 6. Display Linked Discord (if any)
+local discordTag = getNestedValue(currentAgentData, "Account", "Settings", "Discord")
+if discordTag then
+    AccountSection:AddLabel("Discord: " .. discordTag)
+else
+    AccountSection:AddLabel("Discord: Not linked")
+end
+
+-- 7. Display Number of Authorized Sessions
+local authCount = 0
+if currentAgentData.Authorizations then
+    for _ in pairs(currentAgentData.Authorizations) do authCount = authCount + 1 end
+end
+AccountSection:AddLabel("Active Sessions: " .. tostring(authCount))
+
+-- 8. Clipboard button to copy HWID
+AccountSection:AddClipboardLabel("Copy HWID", function()
+    local hwid = gethwid()
+    setclipboard(hwid)
+    getgenv().__Mitulib.Source:Notify({
+        title   = "Account",
+        text    = "HWID copied to clipboard!",
+        color   = Color3.fromRGB(80, 125, 215),
+        duration = 3,
+    })
+end)
 
 Window.Frame.Topbar.Konata.Visible = true
 Window:Toggle(true)
