@@ -38,7 +38,7 @@ local Configuration = {
 		[10277635599] = {
 			Type = "Apeirophobia_Main",
 			Key  = "ep033hWbT0-Ozq9ctgkjvA",
-			Settings = { Version = 1772 },
+			Settings = { Version = 1715 },
 		},
 	},
 }
