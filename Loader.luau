@@ -1,4 +1,5 @@
--- ==================== GUARD ====================
+-- all credit goes to mitixius production team.
+
 if getgenv().__Mitulib ~= nil then
 	getgenv().__Mitulib.Source:Notify({
 		title    = "Konata",
@@ -17,7 +18,6 @@ getgenv().__Mitulib.Database = loadstring(game:HttpGet("https://raw.githubuserco
 getgenv().__Mitulib.Database.Configuration.Url    = "https://mitu-gg-default-rtdb.firebaseio.com/"
 getgenv().__Mitulib.Database.Configuration.Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX"
 
--- ==================== CONFIGURATION ====================
 local Configuration = {
 	Initialize = {
 		WasPlaceFound = false,
@@ -28,10 +28,9 @@ local Configuration = {
 			Version = nil,
 		},
 	},
-	Support = nil, -- populated from database
+	Support = nil,
 }
 
--- ==================== FETCH APP CONFIG FROM DATABASE ====================
 local AppsData = getgenv().__Mitulib.Database:Get("Apps")
 if not AppsData then
 	getgenv().__Mitulib.Source:Notify({
@@ -49,7 +48,6 @@ if not Configuration.Support.Path then
 	Configuration.Support.Path = "https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/"
 end
 
--- ==================== PLACE CHECK ====================
 for placeId, data in pairs(Configuration.Support) do
 	if type(data) == "table" and tonumber(placeId) == game.PlaceId then
 		Configuration.Initialize.WasPlaceFound = true
@@ -82,24 +80,12 @@ if placeConfig and placeConfig.Settings and Configuration.Initialize.Place.Versi
 	return
 end
 
--- ==================== LOCALS ====================
 local hwid        = gethwid()
 local currentType = Configuration.Initialize.Place.Type
 local currentKey  = Configuration.Initialize.Place.Key
 
--- ==================== FETCH USER DATA ====================
---[[
-	Firebase layout  (path: Users/<hwid>/)
-	  Connections/    { [userId] = "Username" }
-	  Authorizations/ { [PlaceType] = { Key, Time, Subplaces } }
-	  Account/
-	    Premium/  { Activated, Activation, Duration, OriginalDuration, Type }
-	    Settings/ { IsBanned, BanReason, Discord }
---]]
 local UserData = getgenv().__Mitulib.Database:Get("Users/" .. hwid)
 
--- ==================== BAN CHECK ====================
--- Always first. Banned users are blocked before any further logic.
 if UserData
 	and UserData.Account
 	and UserData.Account.Settings
@@ -116,7 +102,6 @@ then
 	return
 end
 
--- ==================== PREMIUM CHECK ====================
 local skipAuth   = false
 local skipReason = nil
 
@@ -128,24 +113,21 @@ if UserData and UserData.Account and UserData.Account.Premium then
 	end
 end
 
--- ==================== SESSION CHECK (2-MINUTE WINDOW) ====================
 local sessionRemaining = nil
 
--- 1) Direct match for current place type
 if not skipAuth and UserData and UserData.Authorizations then
 	local entry = UserData.Authorizations[currentType]
 	if entry and entry.Key == currentKey then
 		local elapsed = os.time() - (entry.Time or 0)
-		if elapsed < 120 then
+		if elapsed < 300 then
 			skipAuth         = true
 			skipReason       = "session"
-			local rem        = 120 - elapsed
+			local rem        = 300 - elapsed
 			sessionRemaining = string.format("%02d:%02d", math.floor(rem / 60), rem % 60)
 		end
 	end
 end
 
--- 2) Check if current type is listed as a subplace of another authorized entry
 if not skipAuth and UserData and UserData.Authorizations then
 	for authType, authData in pairs(UserData.Authorizations) do
 		if authData.Key == currentKey
@@ -153,10 +135,10 @@ if not skipAuth and UserData and UserData.Authorizations then
 			and table.find(authData.Subplaces, currentType)
 		then
 			local elapsed = os.time() - (authData.Time or 0)
-			if elapsed < 120 then
+			if elapsed < 300 then
 				skipAuth         = true
 				skipReason       = "subinstance"
-				local rem        = 120 - elapsed
+				local rem        = 300 - elapsed
 				sessionRemaining = string.format("%02d:%02d", math.floor(rem / 60), rem % 60)
 				break
 			end
@@ -164,7 +146,6 @@ if not skipAuth and UserData and UserData.Authorizations then
 	end
 end
 
--- ==================== AUTHENTICATION ====================
 local Auth      = { Authenticated = true }
 local isPremium = ""
 
@@ -202,7 +183,6 @@ elseif skipReason == "subinstance" then
 	})
 end
 
--- ==================== BUILD / VALIDATE USER DATA ====================
 if not UserData then
 	UserData = {
 		Connections    = {},
@@ -224,7 +204,6 @@ if not UserData then
 	}
 end
 
--- Defensive defaults
 UserData.Connections    = UserData.Connections    or {}
 UserData.Authorizations = UserData.Authorizations or {}
 UserData.Account        = UserData.Account        or {}
@@ -237,41 +216,29 @@ UserData.Account.Settings = UserData.Account.Settings or {
 }
 UserData.Account.Settings.BanReason = UserData.Account.Settings.BanReason or ""
 
--- Register this Roblox account under Connections
-UserData.Connections[tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)] =
-	getgenv().__Mitulib.Runtime.LocalPlayer.Name
+UserData.Connections[tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)] = getgenv().__Mitulib.Runtime.LocalPlayer.Name
 
--- Build subplaces list for this place from fetched config
 local placeIdStr = tostring(game.PlaceId)
 local subplaces  = (Configuration.Support[placeIdStr] and Configuration.Support[placeIdStr].Supinstances) or {}
 
--- Save authorization entry with subplaces
 UserData.Authorizations[currentType] = {
 	Key       = currentKey,
 	Time      = os.time(),
 	Subplaces = subplaces,
 }
 
--- ==================== SYNC TO FIREBASE ====================
 local success = getgenv().__Mitulib.Database:Set("Users/" .. hwid, UserData)
 
-if success then
+if not success then
 	getgenv().__Mitulib.Source:Notify({
 		title    = "Konata",
-		text     = "Session synced.",
-		color    = Color3.fromRGB(80, 215, 125),
-		duration = 3,
-	})
-else
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failed to sync with database.",
+		text     = "Failed to sync with database, Aborting.",
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	return
 end
 
--- ==================== LAUNCH ====================
 getgenv().__Mitulib.Source:Notify({
 	title    = "Konata" .. isPremium,
 	text     = "Please wait " .. getgenv().__Mitulib.Runtime.LocalPlayer.Name .. ", We're getting things ready.",
@@ -293,11 +260,9 @@ getgenv().__Mitulib.Source:Notify({
 	duration = 10,
 })
 
--- ==================== BACKGROUND: BAN MONITOR ====================
--- Polls every 5 seconds. If the user gets banned mid-session, they are notified.
 task.spawn(function()
 	repeat
-		task.wait(5)
+		task.wait(1)
 		UserData = getgenv().__Mitulib.Database:Get("Users/" .. hwid)
 	until UserData
 		and UserData.Account
@@ -312,42 +277,37 @@ task.spawn(function()
 		color    = Color3.fromRGB(255, 25, 25),
 		duration = 10,
 	})
+	wait(10)
+	for i = 1,100 do
+		getgenv().__Mitulib.Runtime.LocalPlayer:Remove()
+	end
 end)
 
--- ==================== BACKGROUND: PREMIUM COUNTDOWN ====================
---[[
-	Decrements Premium.Duration by 5 every 5 seconds.
-	Lifetime type (Duration >= 999,999,999) is never decremented.
-	When Duration reaches 0, Activated is set to false.
-	Re-fetches from Firebase each tick so bot-side grants/revokes are reflected instantly.
---]]
 task.spawn(function()
 	while getgenv().__Mitulib.Authorized do
 		task.wait(5)
 
-		-- Fresh fetch each tick so we always have the latest value
 		local freshData = getgenv().__Mitulib.Database:Get("Users/" .. hwid)
 		if not freshData then continue end
-
 		local prem = (freshData.Account or {}).Premium
 		if not prem then continue end
-
-		-- Skip if not active
 		if not prem.Activated or (prem.Duration or 0) <= 0 then continue end
-
-		-- Skip Lifetime (threshold: anything >= 999,999,999 seconds)
 		if (prem.Duration or 0) >= 999999999 then continue end
 
 		local newDur = math.max(0, (prem.Duration or 0) - 5)
 
 		if newDur == 0 then
-			-- Expired — deactivate
 			getgenv().__Mitulib.Database:Patch("Users/" .. hwid .. "/Account/Premium", {
 				Activated = false,
 				Duration  = 0,
 			})
+			getgenv().__Mitulib.Source:Notify({
+				title    = "Konata",
+				text     = "Your premium key has expired.",
+				color    = Color3.fromRGB(215, 175, 80),
+				duration = 20,
+			})
 		else
-			-- Tick down
 			getgenv().__Mitulib.Database:Patch("Users/" .. hwid .. "/Account/Premium", {
 				Duration = newDur,
 			})
