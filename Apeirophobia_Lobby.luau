@@ -57,16 +57,12 @@ local function getLevelNames(chapter)
 	return names
 end
 
--- ── Window ───────────────────────────────────────────────────────────────────
-
 local Window = getgenv().__Mitulib.Source:AddWindow({
 	title   = { "Mitu", "Konata" },
 	theme   = { Accent = Color3.fromRGB(80, 125, 215) },
 	key     = Enum.KeyCode.E,
 	default = false,
 })
-
--- ── Config ───────────────────────────────────────────────────────────────────
 
 local Config = {
 	Room = {
@@ -163,8 +159,6 @@ end)
 SubSections.Options:AddToggle("Friends Only",        { default = false }, function(val) Config.Room.Locked       = val end)
 SubSections.Options:AddToggle("IsTestPlace",         { default = false }, function(val) Config.Room.IsTestPlace  = val end)
 SubSections.Options:AddToggle("IsPre-PublishPlace",  { default = false }, function(val) Config.Room.IsPrePublish = val end)
-
--- ── Actions ──────────────────────────────────────────────────────────────────
 
 Config.State.StatusDual = SubSections.Actions:AddDualLabel({ "Status:", "Idle." })
 
