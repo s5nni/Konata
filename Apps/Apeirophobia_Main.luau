@@ -94,10 +94,23 @@ local Config = {
 
 getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Konata_Heartbeat", function()
 	if Config.LocalPlayer.Character.WalkSpeed.Enabled then
-		local LocalPlayer = getgenv().__Mitulib.Runtime.LocalPlayer
 		if getgenv().__Mitulib.Runtime.IsAlive then
 			local Direction = getgenv().__Mitulib.Runtime.Humanoid.MoveDirection * Config.LocalPlayer.Character.WalkSpeed.Value
-			getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity = Vector3.new(Direction.X, getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity.Y, Direction.Z)
+			if getgenv().__Mitulib.Runtime.Humanoid:GetState() ~= Enum.HumanoidStateType.Climbing then
+				getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity = Vector3.new(Direction.X, getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity.Y, Direction.Z)
+			end
+		end
+	end
+end)
+
+getgenv().__Mitulib.Runtime._Connections.No_Jump_DelayInputBegan = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessedEvent)
+	if gameProcessedEvent then return end
+	if not Config.LocalPlayer.Character.No_Jump_Delay.Enabled then return end
+	if input.KeyCode == Enum.KeyCode.Space then
+		if getgenv().__Mitulib.Runtime.IsAlive then
+			if getgenv().__Mitulib.Runtime.Humanoid.FloorMaterial ~= Enum.Material.Air then
+				getgenv().__Mitulib.Runtime.Humanoid.Jump = true
+			end
 		end
 	end
 end)
@@ -110,12 +123,17 @@ Tabs.Settings = Window:AddTab("Settings", {default = false})
 -----------------------------------------
 
 local Character = Tabs.LocalPlayer:AddSection("Character", {default = false})
-Character:AddSlider("WalkSpeed", 0, 50, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Value, Enabled)
+Character:AddSlider("WalkSpeed", 0, 100, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Value, Enabled)
 	Config.LocalPlayer.Character.WalkSpeed.Enabled = Enabled
 	Config.LocalPlayer.Character.WalkSpeed.Value = Value
 end)
-Character:AddSlider("JumpPower", 0, 200, 50, {flag = "JumpPowerSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true})
-Character:AddToggle("No Jump Delay", {flag = "NoJumpDelayToggle", default = false})
+Character:AddSlider("JumpPower", 0, 200, 50, {flag = "JumpPowerSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Value, Enabled)
+	Config.LocalPlayer.Character.JumpPower.Enabled = Enabled
+	Config.LocalPlayer.Character.JumpPower.Value = Value
+end)
+Character:AddToggle("No Jump Delay", {flag = "NoJumpDelayToggle", default = false}, function(Enabled)
+	Config.LocalPlayer.Character.No_Jump_Delay.Enabled = Enabled
+end)
 
 -----------------------------------------
 Window.Frame.Topbar.Konata.Visible = true
