@@ -110,7 +110,7 @@ Tabs.Settings = Window:AddTab("Settings", {default = false})
 -----------------------------------------
 
 local Character = Tabs.LocalPlayer:AddSection("Character", {default = false})
-Character:AddSlider("WalkSpeed", 0, 50, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Enabled, Value)
+Character:AddSlider("WalkSpeed", 0, 50, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Value, Enabled)
 	Config.LocalPlayer.Character.WalkSpeed.Enabled = Enabled
 	Config.LocalPlayer.Character.WalkSpeed.Value = Value
 end)
