@@ -9,7 +9,7 @@ if __Data[game.PlaceId] ~= nil and __Data[game.PlaceId].Settings ~= nil and __Da
 	__DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, __Data[game.PlaceId].Settings.Seed, __Length)
 end
 
-print(__DecodedKey)
+print(__Key,__Length,__Data,__DecodedKey)
 
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
