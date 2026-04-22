@@ -1,7 +1,7 @@
 local Codec = {}
 
 -- allowed character sets
-local LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
+local LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 local DIGITS = "0123456789"
 
 local L_SIZE = #LETTERS
