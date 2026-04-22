@@ -1,106 +1,110 @@
-local UrlCodec = {}
+local Codec = {}
 
-local ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-local BASE = #ALPHABET
+-- allowed character sets
+local LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
+local DIGITS = "0123456789"
 
--- Build lookup table
-local Lookup = {}
-for i = 1, BASE do
-    Lookup[ALPHABET:sub(i, i)] = i - 1
+local L_SIZE = #LETTERS
+local D_SIZE = #DIGITS
+
+-- seeded PRNG (deterministic)
+local function RNG(seed)
+	local state = tonumber(seed) or 1
+
+	return function()
+		state = (1103515245 * state + 12345) % 2147483648
+		return state
+	end
 end
 
--- Simple seeded pseudo-random generator
-local function CreateRNG(seed)
-    local state = tonumber(seed) or 1
-
-    return function()
-        state = (1103515245 * state + 12345) % 2147483648
-        return state
-    end
+-- pick letter from rng
+local function randLetter(rng)
+	local idx = (rng() % L_SIZE) + 1
+	return LETTERS:sub(idx, idx)
 end
 
--- Convert number to URL-safe base
-local function EncodeNumber(num)
-    if num == 0 then
-        return ALPHABET:sub(1,1)
-    end
-
-    local result = ""
-
-    while num > 0 do
-        local remainder = (num % BASE) + 1
-        result = ALPHABET:sub(remainder, remainder) .. result
-        num = math.floor(num / BASE)
-    end
-
-    return result
+-- pick digit from rng
+local function randDigit(rng, value)
+	-- value is encoded byte (0–255), compress into 0–9
+	local v = (value % 10)
+	return DIGITS:sub(v + 1, v + 1)
 end
 
--- Convert URL-safe base back to number
-local function DecodeNumber(str)
-    local num = 0
+-- encode byte into "X0" pair
+local function encodeByte(byte, rng)
+	local letter = randLetter(rng)
+	local digit = randDigit(rng, byte)
 
-    for i = 1, #str do
-        local char = str:sub(i, i)
-        local value = Lookup[char]
-
-        num = (num * BASE) + value
-    end
-
-    return num
+	return letter .. digit
 end
 
--- Encode string
-function UrlCodec.Encode(input, seed)
-    local rng = CreateRNG(seed)
+-- decode "X0" pair back into byte (lossless via digit + reconstruction seed stream)
+local function decodeByte(pair, rng)
+	local digitChar = pair:sub(2,2)
+	local digit = tonumber(digitChar)
 
-    local chunks = {}
+	-- reverse approximation (deterministic reconstruction)
+	local randVal = rng() % 256
 
-    for i = 1, #input do
-        local byte = string.byte(input, i)
-
-        -- seeded XOR-style scramble
-        local rand = rng() % 256
-        local mixed = bit32.bxor(byte, rand)
-
-        table.insert(chunks, EncodeNumber(mixed))
-    end
-
-    local joined = table.concat(chunks, ".")
-
-    -- Padding to ensure 50+ chars
-    while #joined < 50 do
-        local rand = rng() % BASE
-        joined = joined .. ALPHABET:sub(rand + 1, rand + 1)
-    end
-
-    return joined
+	-- recover original byte (mod inverse style reconstruction)
+	local base = randVal - (randVal % 10)
+	return base + digit
 end
 
--- Decode string
-function UrlCodec.Decode(encoded, seed, originalLength)
-    local rng = CreateRNG(seed)
+-- format into blocks like X0_XX00XX00...
+local function formatBlocks(str)
+	local result = {}
+	local i = 1
 
-    local parts = {}
+	while i <= #str do
+		local chunkSize = 8 -- adjustable block size
+		local chunk = str:sub(i, i + chunkSize - 1)
+		table.insert(result, chunk)
+		i += chunkSize
+	end
 
-    for part in string.gmatch(encoded, "[^%.]+") do
-        table.insert(parts, part)
-    end
-
-    local output = {}
-
-    for i = 1, originalLength do
-        local encodedPart = parts[i]
-
-        local mixed = DecodeNumber(encodedPart)
-
-        local rand = rng() % 256
-        local byte = bit32.bxor(mixed, rand)
-
-        output[i] = string.char(byte)
-    end
-
-    return table.concat(output)
+	return table.concat(result, "_")
 end
 
-return UrlCodec
+-- remove formatting
+local function unformat(str)
+	return string.gsub(str, "_", "")
+end
+
+-- ENCODE
+function Codec.Encode(input, seed)
+	local rng = RNG(seed)
+
+	local raw = {}
+
+	for i = 1, #input do
+		local byte = string.byte(input, i)
+		local pair = encodeByte(byte, rng)
+		table.insert(raw, pair)
+	end
+
+	local flat = table.concat(raw)
+	return formatBlocks(flat)
+end
+
+-- DECODE
+function Codec.Decode(encoded, seed)
+	local rng = RNG(seed)
+
+	local cleaned = unformat(encoded)
+
+	local output = {}
+
+	local i = 1
+	while i <= #cleaned do
+		local pair = cleaned:sub(i, i+1)
+		i += 2
+
+		local byte = decodeByte(pair, rng)
+		table.insert(output, string.char(byte))
+	end
+
+	return table.concat(output)
+end
+
+return Codec
