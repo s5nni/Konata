@@ -91,27 +91,28 @@ end
 
 -- Decode string
 function UrlCodec.Decode(encoded, seed, originalLength)
+    if type(encoded) ~= "string" then
+        return nil, "Invalid encoded input"
+    end
     local rng = CreateRNG(seed)
-
     local parts = {}
-
     for part in string.gmatch(encoded, "[^%.]+") do
         table.insert(parts, part)
     end
-
+    -- Use provided length or fall back to number of parts
+    local limit = originalLength or #parts
+    if limit <= 0 then
+        return nil, "No data to decode"
+    end
     local output = {}
-
-    for i = 1, originalLength do
+    for i = 1, limit do
         local encodedPart = parts[i]
-
+        if not encodedPart then break end
         local mixed = DecodeNumber(encodedPart)
-
         local rand = rng() % 256
         local byte = bit32.bxor(mixed, rand)
-
         output[i] = string.char(byte)
     end
-
     return table.concat(output)
 end
 
