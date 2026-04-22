@@ -1,40 +1,65 @@
--- Varargs from loader
+-- Protection layer from direct execution.
 local __Key, __Length = ...
 
 local __Data = getgenv().__Mitulib.Database:Get("Apps")
 if type(__Data) ~= "table" then
-	warn("[Konata] Apps table missing or invalid")
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
 	return
 end
 local placeId = tostring(game.PlaceId)
 local placeData = __Data[placeId]
 if type(placeData) ~= "table" then
-	warn("[Konata] No config for PlaceId:", placeId)
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
 	return
 end
 local settings = placeData.Settings
 if type(settings) ~= "table" then
-	warn("[Konata] Missing Settings for PlaceId:", placeId)
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
 	return
 end
 local seed = settings.Seed
 if type(seed) ~= "string" then
-	warn("[Konata] Invalid or missing Seed (expected string)")
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
 	return
 end
 if type(__Key) ~= "string" then
-	warn("[Konata] Invalid encoded key")
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
 	return
 end
 local __DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, seed, __Length)
-print("[Konata Decode]")
-print("PlaceId:", placeId)
-print("Seed:", seed)
-print("EncodedKey:", __Key)
-print("Length:", __Length)
-print("DecodedKey:", __DecodedKey)
-if __DecodedKey == nil then
-	warn("[Konata] Decode returned nil — check Encode/Decode parity")
+if __DecodedKey ~= placeData.Key then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failure.\n"..__Key,
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
 end
 
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
