@@ -1,18 +1,41 @@
+-- Varargs from loader
 local __Key, __Length = ...
 
-local __Data = getgenv().__Mitulib.Database:Get("Apps/")
-local __DecodedKey
-if __Data[game.PlaceId]
-	and __Data[game.PlaceId].Settings
-	and __Data[game.PlaceId].Settings.Seed then
-
-	__DecodedKey = getgenv().__Mitulib.Encode.Decode(
-		__Key,
-		__Data[game.PlaceId].Settings.Seed,
-		__Length
-	)
+local __Data = getgenv().__Mitulib.Database:Get("Apps")
+if type(__Data) ~= "table" then
+	warn("[Konata] Apps table missing or invalid")
+	return
 end
-print(__Key, __Length, __DecodedKey)
+local placeId = tostring(game.PlaceId)
+local placeData = __Data[placeId]
+if type(placeData) ~= "table" then
+	warn("[Konata] No config for PlaceId:", placeId)
+	return
+end
+local settings = placeData.Settings
+if type(settings) ~= "table" then
+	warn("[Konata] Missing Settings for PlaceId:", placeId)
+	return
+end
+local seed = settings.Seed
+if type(seed) ~= "string" then
+	warn("[Konata] Invalid or missing Seed (expected string)")
+	return
+end
+if type(__Key) ~= "string" then
+	warn("[Konata] Invalid encoded key")
+	return
+end
+local __DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, seed, __Length)
+print("[Konata Decode]")
+print("PlaceId:", placeId)
+print("Seed:", seed)
+print("EncodedKey:", __Key)
+print("Length:", __Length)
+print("DecodedKey:", __DecodedKey)
+if __DecodedKey == nil then
+	warn("[Konata] Decode returned nil — check Encode/Decode parity")
+end
 
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
