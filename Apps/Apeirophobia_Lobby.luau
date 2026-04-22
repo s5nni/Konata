@@ -1,15 +1,18 @@
--- This is a protection layer from direct execution, Ensuring the script can only ran when a key was provided.
-local __ReturnedArguments = ...
-local __Key = __ReturnedArguments[1]
-local __Length = __ReturnedArguments[2]
+local __Key, __Length = ...
+
 local __Data = getgenv().__Mitulib.Database:Get("Apps/")
+local __DecodedKey
+if __Data[game.PlaceId]
+	and __Data[game.PlaceId].Settings
+	and __Data[game.PlaceId].Settings.Seed then
 
-local __DecodedKey = nil
-if __Data[game.PlaceId] ~= nil and __Data[game.PlaceId].Settings ~= nil and __Data[game.PlaceId].Settings.Seed ~= nil then
-	__DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, __Data[game.PlaceId].Settings.Seed, __Length)
+	__DecodedKey = getgenv().__Mitulib.Encode.Decode(
+		__Key,
+		__Data[game.PlaceId].Settings.Seed,
+		__Length
+	)
 end
-
-print(__Key,__Length,__Data,__DecodedKey)
+print(__Key, __Length, __DecodedKey)
 
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
