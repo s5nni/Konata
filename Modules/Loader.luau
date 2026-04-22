@@ -45,7 +45,7 @@ end
 Configuration.Support = AppsData
 
 if not Configuration.Support.Path then
-	Configuration.Support.Path = "https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/"
+	Configuration.Support.Path = "https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Apps/"
 end
 
 for placeId, data in pairs(Configuration.Support) do
