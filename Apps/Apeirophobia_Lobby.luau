@@ -1,7 +1,16 @@
-local Attempts = 0
-repeat Attempts = Attempts + 1; wait(1); until getgenv().__Mitulib.Authorized == true
+-- This is a protection layer from direct execution, Ensuring the script can only ran when a key was provided.
+local __ReturnedArguments = ...
+local __Key = __ReturnedArguments[1]
+local __Length = __ReturnedArguments[2]
+local __Data = getgenv().__Mitulib.Database:Get("Apps/")
 
-local main_Dehash = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Dehash.luau"))()
+local __DecodedKey = nil
+if __Data[game.PlaceId] ~= nil and __Data[game.PlaceId].Settings ~= nil and __Data[game.PlaceId].Settings.Seed ~= nil then
+	__DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, __Data[game.PlaceId].Settings.Seed, __Length)
+end
+
+print(__DecodedKey)
+
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
 __ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
