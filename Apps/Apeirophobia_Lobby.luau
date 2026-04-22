@@ -1,5 +1,5 @@
 -- Protection layer from direct execution.
-local __Key, __Length = ...
+local __Key, __Length = ... or "Not provided.", nil
 
 local __Data = getgenv().__Mitulib.Database:Get("Apps")
 if type(__Data) ~= "table" then
