@@ -117,7 +117,7 @@ local function getLevelNames(chapter)
 end
 
 local Window = getgenv().__Mitulib.Source:AddWindow({
-	title   = { "Mitu", "Konata" },
+	title   = { "Mitu", "Konata (Lobby)" },
 	theme   = { Accent = Color3.fromRGB(80, 125, 215) },
 	key     = Enum.KeyCode.E,
 	default = false,
