@@ -1,107 +1,87 @@
-local UrlCodec = {}
+local Codec = {}
 
--- URL-safe alphabet
 local ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 local BASE = #ALPHABET
 
--- Build lookup table
 local Lookup = {}
 for i = 1, BASE do
-    Lookup[ALPHABET:sub(i, i)] = i - 1
+    Lookup[ALPHABET:sub(i,i)] = i - 1
 end
 
--- Simple seeded pseudo-random generator
-local function CreateRNG(seed)
-    local state = tonumber(seed) or 1
-
+local function RNG(seed)
+    local state = seed
     return function()
         state = (1103515245 * state + 12345) % 2147483648
         return state
     end
 end
 
--- Convert number to URL-safe base
-local function EncodeNumber(num)
-    if num == 0 then
-        return ALPHABET:sub(1,1)
-    end
-
-    local result = ""
-
-    while num > 0 do
-        local remainder = (num % BASE) + 1
-        result = ALPHABET:sub(remainder, remainder) .. result
-        num = math.floor(num / BASE)
-    end
-
-    return result
+local function encodeByte(n)
+    return ALPHABET:sub((n % BASE) + 1, (n % BASE) + 1)
 end
 
--- Convert URL-safe base back to number
-local function DecodeNumber(str)
-    local num = 0
-
-    for i = 1, #str do
-        local char = str:sub(i, i)
-        local value = Lookup[char]
-
-        num = (num * BASE) + value
-    end
-
-    return num
+local function decodeByte(c)
+    return Lookup[c]
 end
 
--- Encode string
-function UrlCodec.Encode(input, seed)
-    local rng = CreateRNG(seed)
+-- encode string (self-contained)
+function Codec.Encode(str, seed)
+    local rng = RNG(seed)
 
-    local chunks = {}
+    local len = #str
+    local out = {}
 
-    for i = 1, #input do
-        local byte = string.byte(input, i)
-
-        -- seeded XOR-style scramble
-        local rand = rng() % 256
-        local mixed = bit32.bxor(byte, rand)
-
-        table.insert(chunks, EncodeNumber(mixed))
+    -- store length first (3 chars fixed)
+    for i = 1, 3 do
+        local shift = rng() % 256
+        local b = math.floor(len / (256 ^ (i - 1))) % 256
+        b = bit32.bxor(b, shift)
+        table.insert(out, encodeByte(b))
     end
 
-    local joined = table.concat(chunks, ".")
-
-    -- Padding to ensure 50+ chars
-    while #joined < 50 do
-        local rand = rng() % BASE
-        joined = joined .. ALPHABET:sub(rand + 1, rand + 1)
+    for i = 1, len do
+        local b = string.byte(str, i)
+        local r = rng() % 256
+        local mixed = bit32.bxor(b, r)
+        table.insert(out, encodeByte(mixed))
     end
 
-    return joined
+    -- padding (optional, purely cosmetic)
+    while #table.concat(out) < 50 do
+        local r = rng() % BASE
+        table.insert(out, ALPHABET:sub(r+1, r+1))
+    end
+
+    return table.concat(out)
 end
 
--- Decode string
-function UrlCodec.Decode(encoded, seed, originalLength)
-    local rng = CreateRNG(seed)
+function Codec.Decode(encoded, seed)
+    local rng = RNG(seed)
 
-    local parts = {}
+    local bytes = {}
 
-    for part in string.gmatch(encoded, "[^%.]+") do
-        table.insert(parts, part)
+    for c in encoded:gmatch(".") do
+        table.insert(bytes, decodeByte(c) or 0)
     end
 
-    local output = {}
-
-    for i = 1, originalLength do
-        local encodedPart = parts[i]
-
-        local mixed = DecodeNumber(encodedPart)
-
-        local rand = rng() % 256
-        local byte = bit32.bxor(mixed, rand)
-
-        output[i] = string.char(byte)
+    -- read length (first 3 bytes)
+    local len = 0
+    for i = 1, 3 do
+        local shift = rng() % 256
+        len = len + bit32.bxor(bytes[i], shift) * (256 ^ (i - 1))
     end
 
-    return table.concat(output)
+    local out = {}
+
+    local idx = 4
+    for i = 1, len do
+        local r = rng() % 256
+        local b = bit32.bxor(bytes[idx], r)
+        out[i] = string.char(b)
+        idx += 1
+    end
+
+    return table.concat(out)
 end
 
-return UrlCodec
+return Codec
