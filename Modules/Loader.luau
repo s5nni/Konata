@@ -248,10 +248,51 @@ getgenv().__Mitulib.Source:Notify({
 
 getgenv().__Mitulib.Authorized = true
 
-loadstring(game:HttpGet(
-	Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau",
-	false
-	))(getgenv().__Mitulib.Encode.Encode(Configuration.Initialize.Place.Key), 22)
+
+local __Data = getgenv().__Mitulib.Database:Get("Apps")
+if type(__Data) ~= "table" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failed to sync with database, Aborting.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+local placeId = tostring(game.PlaceId)
+local placeData = __Data[placeId]
+if type(placeData) ~= "table" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failed to sync with database, Aborting.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+local settings = placeData.Settings
+if type(settings) ~= "table" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failed to sync with database, Aborting.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+local seed = settings.Seed
+if type(seed) ~= "string" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failed to sync with database, Aborting.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+
+local encoded = getgenv().__Mitulib.Encode.Encode(Configuration.Initialize.Place.Key, seed)
+loadstring(game:HttpGet(Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau", false))(encoded, 22)
 
 getgenv().__Mitulib.Source:Notify({
 	title    = "Konata" .. isPremium,
