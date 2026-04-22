@@ -96,7 +96,7 @@ getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Konata_Heartbeat", functio
 	if Config.LocalPlayer.Character.WalkSpeed.Enabled then
 		local LocalPlayer = getgenv().__Mitulib.Runtime.LocalPlayer
 		if getgenv().__Mitulib.Runtime.IsAlive then
-			local Direction = getgenv().__Mitulib.Runtime.Humanoid.MoveDirection.Unit * Config.LocalPlayer.Character.WalkSpeed.Value
+			local Direction = getgenv().__Mitulib.Runtime.Humanoid.MoveDirection * Config.LocalPlayer.Character.WalkSpeed.Value
 			getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity = Vector3.new(Direction.X, getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity.Y, Direction.Z)
 		end
 	end
