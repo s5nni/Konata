@@ -292,7 +292,7 @@ if type(seed) ~= "string" then
 end
 
 local encoded = getgenv().__Mitulib.Encode.Encode(Configuration.Initialize.Place.Key, seed)
-loadstring(game:HttpGet(Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau", false))(encoded, 22)
+loadstring(game:HttpGet(Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau", false))(encoded, #Configuration.Initialize.Place.Key)
 
 getgenv().__Mitulib.Source:Notify({
 	title    = "Konata" .. isPremium,
