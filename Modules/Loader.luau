@@ -1,15 +1,3 @@
--- all credit goes to mitixius production team.
-
-if getgenv().__Mitulib ~= nil then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Already injected.",
-		color    = Color3.fromRGB(80, 125, 215),
-		duration = 5,
-	})
-	return
-end
-
 getgenv().__Mitulib          = {}
 getgenv().__Mitulib.Source   = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Source.luau",   false))()
 getgenv().__Mitulib.Runtime  = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Runtime.luau",  false))()
@@ -248,7 +236,6 @@ getgenv().__Mitulib.Source:Notify({
 
 getgenv().__Mitulib.Authorized = true
 
-
 local __Data = getgenv().__Mitulib.Database:Get("Apps")
 if type(__Data) ~= "table" then
 	getgenv().__Mitulib.Source:Notify({
@@ -259,6 +246,7 @@ if type(__Data) ~= "table" then
 	})
 	return
 end
+
 local placeId = tostring(game.PlaceId)
 local placeData = __Data[placeId]
 if type(placeData) ~= "table" then
@@ -270,6 +258,7 @@ if type(placeData) ~= "table" then
 	})
 	return
 end
+
 local settings = placeData.Settings
 if type(settings) ~= "table" then
 	getgenv().__Mitulib.Source:Notify({
@@ -280,6 +269,7 @@ if type(settings) ~= "table" then
 	})
 	return
 end
+
 local seed = settings.Seed
 if type(seed) ~= "string" then
 	getgenv().__Mitulib.Source:Notify({
@@ -291,8 +281,56 @@ if type(seed) ~= "string" then
 	return
 end
 
-local encoded = getgenv().__Mitulib.Encode.Encode(Configuration.Initialize.Place.Key, seed)
-loadstring(game:HttpGet(Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau", false))(encoded, #Configuration.Initialize.Place.Key)
+-- Validate the key before encoding
+local key = Configuration.Initialize.Place.Key
+if type(key) ~= "string" or key == "" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Configuration key is missing or invalid.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+
+-- Encode the key (with pcall to catch internal encoder errors)
+local success, encoded = pcall(getgenv().__Mitulib.Encode.Encode, key, seed)
+if not success then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Encoding failed: " .. tostring(encoded),
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+
+-- Load the game script and pass the encoded data
+local scriptUrl = Configuration.Support.Path .. Configuration.Initialize.Place.Type .. ".luau"
+local success2, scriptFunc = pcall(loadstring, game:HttpGet(scriptUrl, false))
+if not success2 or type(scriptFunc) ~= "function" then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Failed to load game script.",
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+
+-- Execute the script with encoded data and length
+local success3, err = pcall(scriptFunc, encoded, #key)
+if not success3 then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Game script execution error: " .. tostring(err),
+		color    = Color3.fromRGB(215, 80, 80),
+		duration = 5,
+	})
+	return
+end
+
+warn("Success")
 
 getgenv().__Mitulib.Source:Notify({
 	title    = "Konata" .. isPremium,
