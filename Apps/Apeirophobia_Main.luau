@@ -74,6 +74,34 @@ local Window = getgenv().__Mitulib.Source:AddWindow({
 	default = false,
 })
 
+local Config = {
+	LocalPlayer = {
+		Character = {
+			WalkSpeed = {
+				Enabled = false,
+				Value = 16,
+			},
+			JumpPower = {
+				Enabled = false,
+				Value = 50,
+			},
+			No_Jump_Delay = {
+				Enabled = false,
+			},
+		},
+	},
+}
+
+getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Konata_Heartbeat", function()
+	if Config.LocalPlayer.Character.WalkSpeed.Enabled then
+		local LocalPlayer = getgenv().__Mitulib.Runtime.LocalPlayer
+		if getgenv().__Mitulib.Runtime.IsAlive then
+			local Direction = getgenv().__Mitulib.Runtime.Humanoid.MoveDirection.Unit * Config.LocalPlayer.Character.WalkSpeed.Value
+			getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity = Vector3.new(Direction.X, getgenv().__Mitulib.Runtime.HumanoidRootPart.Velocity.Y, Direction.Z)
+		end
+	end
+end)
+
 local Tabs = {}
 Tabs.LocalPlayer = Window:AddTab("LocalPlayer", {default = true})
 Tabs.Miscellaneous = Window:AddTab("Miscellaneous", {default = false})
@@ -82,7 +110,10 @@ Tabs.Settings = Window:AddTab("Settings", {default = false})
 -----------------------------------------
 
 local Character = Tabs.LocalPlayer:AddSection("Character", {default = false})
-Character:AddSlider("WalkSpeed", 0, 50, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true})
+Character:AddSlider("WalkSpeed", 0, 50, 16, {flag = "WalkSpeedSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true}, function(Enabled, Value)
+	Config.LocalPlayer.Character.WalkSpeed.Enabled = Enabled
+	Config.LocalPlayer.Character.WalkSpeed.Value = Value
+end)
 Character:AddSlider("JumpPower", 0, 200, 50, {flag = "JumpPowerSlider", rounded = false, cap = true, dual = false, toggleable = true, default = false, fireondrag = true})
 Character:AddToggle("No Jump Delay", {flag = "NoJumpDelayToggle", default = false})
 
