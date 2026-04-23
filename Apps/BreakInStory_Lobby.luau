@@ -103,7 +103,11 @@ getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Sync", function()
 			warn("No apps/user found")
 			return
 		end
-		getgenv().__Mitulib.Database:Patch("Users/"..gethwid().."/Connections/"..game.PlaceId.."/Cloud/"..appsData.Type, Config)
+		local hwid = gethwid()
+		local userId = tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)
+		local placeId = game.PlaceId
+		local connPath = "Users/" .. hwid .. "/Connections/" .. userId .. "/Cloud/" .. appsData.Type
+		getgenv().__Mitulib.Database:Patch(connPath, Config)
 		canUpdate = false
 	end
 end)
