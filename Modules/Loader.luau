@@ -242,9 +242,7 @@ Connections[userId] = {
 	},
 	Syncing = false,
 	Cloud = {
-		[Configuration.Initialize.Place.Type] = {
-			"Syncing cloud is not out yet, but we promise it :)"
-		},
+		[Configuration.Initialize.Place.Type] = {},
 	},
 }
 
