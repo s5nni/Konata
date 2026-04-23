@@ -87,66 +87,24 @@ local Sections = {}
 Sections.Account = Tabs.Settings:AddSection("Account", {default = false})
 ---------------------------------------------
 
-local oldConfig = nil
 local canUpdate = false
 getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Sync", function()
 	if canUpdate == true then return end
 	if not canUpdate then
 		canUpdate = true
-		oldConfig = Config
 		wait(5)
-		-- Deep‑compare oldConfig and Config, ignoring Sync_Cloud.Enabled
-		local function deepEqual(a, b, ignorePath)
-			-- ignorePath is a list of keys like {"Settings","Account","Sync_Cloud","Enabled"}
-			-- For simplicity, we nil that exact leaf before comparing.
-			local function stripPath(tbl, path)
-				for i = 1, #path - 1 do
-					if type(tbl) ~= "table" then return end
-					tbl = tbl[path[i]]
-				end
-				if type(tbl) == "table" then
-					tbl[path[#path]] = nil
-				end
+		local appsData = getgenv().__Mitulib.Database:Get("Apps/"..game.PlaceId)
+		local userData = getgenv().__Mitulib.Database:Get("Users/"..gethwid())
+		if appsData and userData then
+			if userData.Connections[getgenv().__Mitulib.Runtime.LocalPlayer.UserId].Cloud[appsData.Type] then
+				Config.Settings.Account.Label.Label2.Text = "Yes"
 			end
-
-			local copyA = getgenv().__Mitulib.Runtime.DeepCopy and getgenv().__Mitulib.Runtime.DeepCopy(oldConfig) or oldConfig -- assume minimal shallow copy if not available? Better to implement.
-			local copyB = getgenv().__Mitulib.Runtime.DeepCopy and getgenv().__Mitulib.Runtime.DeepCopy(Config) or Config
-
-			-- Fallback deep copy (since we can't assume library functions exist)
-			if not copyA then
-				local function _deepCopy(orig)
-					if type(orig) ~= "table" then return orig end
-					local copy = {}
-					for k, v in pairs(orig) do
-						copy[k] = _deepCopy(v)
-					end
-					return copy
-				end
-				copyA = _deepCopy(oldConfig)
-				copyB = _deepCopy(Config)
-			end
-
-			stripPath(copyA, {"Settings", "Account", "Sync_Cloud", "Enabled"})
-			stripPath(copyB, {"Settings", "Account", "Sync_Cloud", "Enabled"})
-			
-			local function _equal(a, b)
-				if type(a) ~= type(b) then return false end
-				if type(a) ~= "table" then return a == b end
-				for k, v in pairs(a) do
-					if not _equal(v, b[k]) then return false end
-				end
-				for k, _ in pairs(b) do
-					if a[k] == nil then return false end
-				end
-				return true
-			end
-
-			if not _equal(copyA, copyB) then
-				warn("found")
-			end
+		else
+			warn("No apps/user found")
+			return
 		end
-
-		deepEqual(oldConfig, Config)
+		getgenv().__Mitulib.Database:Patch("Users/"..gethwid().."/Connections"..game.PlaceId.."/Cloud"..appsData.Type, Config)
+		canUpdate = false
 	end
 end)
 
