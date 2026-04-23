@@ -1,10 +1,34 @@
-getgenv().__Mitulib          = {}
-getgenv().__Mitulib.Source   = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Source.luau",   false))()
-getgenv().__Mitulib.Runtime  = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Runtime.luau",  false))()
-getgenv().__Mitulib.Database = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Database.luau",     false))()
-getgenv().__Mitulib.Encode 	 = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Encode.luau", 	false))()
-getgenv().__Mitulib.Database.Configuration.Url    = "https://mitu-gg-default-rtdb.firebaseio.com/"
-getgenv().__Mitulib.Database.Configuration.Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX"
+assert(getgenv, "Executor does not support getgenv")
+
+if getgenv().__MituRunning == true then
+	getgenv().__Mitulib.Source:Notify({
+		title    = "Konata",
+		text     = "Rejected, Reason: "..getgenv().__Mitulib.Reason,
+		color    = Color3.fromRGB(80, 125, 215),
+		duration = 10,
+	})
+	return
+end
+
+getgenv().__MituRunning = true
+getgenv().__Mitulib = {}
+getgenv().__Mitulib.Reason = "Not provided."
+
+if getgenv().__Mitulib.Source == nil then
+	getgenv().__Mitulib.Source = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Source.luau", false))()
+end
+if getgenv().__Mitulib.Runtime == nil then
+	getgenv().__Mitulib.Runtime = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/UI-Library/refs/heads/main/Runtime.luau", false))()
+end
+if getgenv().__Mitulib.Encode == nil then
+	getgenv().__Mitulib.Encode = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Encode.luau", false))()
+end
+
+if getgenv().__Mitulib.Database == nil then
+	getgenv().__Mitulib.Database = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Database.luau", false))()
+	getgenv().__Mitulib.Database.Configuration.Url = "https://mitu-gg-default-rtdb.firebaseio.com/"
+	getgenv().__Mitulib.Database.Configuration.Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX"
+end
 
 local Configuration = {
 	Initialize = {
@@ -27,6 +51,7 @@ if not AppsData then
 		color    = Color3.fromRGB(255, 25, 25),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to load app configuration."
 	return
 end
 
@@ -54,6 +79,7 @@ if not Configuration.Initialize.WasPlaceFound then
 		color    = Color3.fromRGB(255, 25, 25),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Game unsupported."
 	return
 end
 
@@ -65,6 +91,7 @@ if placeConfig and placeConfig.Settings and Configuration.Initialize.Place.Versi
 		color    = Color3.fromRGB(255, 175, 25),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Experience had an update. Code disabled for debugging."
 	return
 end
 
@@ -87,6 +114,7 @@ then
 		color    = Color3.fromRGB(255, 25, 25),
 		duration = 10,
 	})
+	getgenv().__Mitulib.Reason = "You are banned from Konata, contact support."
 	return
 end
 
@@ -204,7 +232,23 @@ UserData.Account.Settings = UserData.Account.Settings or {
 }
 UserData.Account.Settings.BanReason = UserData.Account.Settings.BanReason or ""
 
-UserData.Connections[tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)] = getgenv().__Mitulib.Runtime.LocalPlayer.Name
+local Connections = {}
+local userId = tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)
+Connections[userId] = {
+	Username = getgenv().__Mitulib.Runtime.LocalPlayer.Name,
+	Session = {
+		IsActive = false,
+		Tracking = { Next = 5, Current = 0 }
+	},
+	Syncing = false,
+	Cloud = {
+		[Configuration.Initialize.Place.Type] = {
+			"Syncing cloud is not out yet, but we promise it :)"
+		},
+	},
+}
+
+UserData.Connections = Connections
 
 local placeIdStr = tostring(game.PlaceId)
 local subplaces  = (Configuration.Support[placeIdStr] and Configuration.Support[placeIdStr].Supinstances) or {}
@@ -224,6 +268,7 @@ if not success then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to sync with database."
 	return
 end
 
@@ -244,6 +289,7 @@ if type(__Data) ~= "table" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to sync with database."
 	return
 end
 
@@ -256,6 +302,7 @@ if type(placeData) ~= "table" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to sync with database."
 	return
 end
 
@@ -267,6 +314,7 @@ if type(settings) ~= "table" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to sync with database."
 	return
 end
 
@@ -278,6 +326,7 @@ if type(seed) ~= "string" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to sync with database."
 	return
 end
 
@@ -290,6 +339,7 @@ if type(key) ~= "string" or key == "" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Configuration key is missing or invalid."
 	return
 end
 
@@ -302,6 +352,7 @@ if not success then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Encoding failed."
 	return
 end
 
@@ -315,10 +366,10 @@ if not success2 or type(scriptFunc) ~= "function" then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Failed to load game script."
 	return
 end
 
--- Execute the script with encoded data and length
 local success3, err = pcall(scriptFunc, encoded, #key)
 if not success3 then
 	getgenv().__Mitulib.Source:Notify({
@@ -327,10 +378,9 @@ if not success3 then
 		color    = Color3.fromRGB(215, 80, 80),
 		duration = 5,
 	})
+	getgenv().__Mitulib.Reason = "Game script execution error."
 	return
 end
-
-warn("Success")
 
 getgenv().__Mitulib.Source:Notify({
 	title    = "Konata" .. isPremium,
@@ -338,6 +388,8 @@ getgenv().__Mitulib.Source:Notify({
 	color    = Color3.fromRGB(80, 125, 215),
 	duration = 10,
 })
+
+getgenv().__Mitulib.Reason = "Script loaded."
 
 task.spawn(function()
 	repeat
