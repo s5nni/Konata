@@ -243,7 +243,7 @@ Connections[userId] = {
 	Syncing = false,
 	Cloud = {
 		[Configuration.Initialize.Place.Type] = {
-			IsReal = "Israel"
+			IsActive = true
 		},
 	},
 }
