@@ -99,7 +99,7 @@ getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Sync", function()
 			local userId = tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)
 			local cloudTable = userData.Connections and userData.Connections[userId] and userData.Connections[userId].Cloud
 			if cloudTable and cloudTable[appsData.Type] then
-				Config.Settings.Account.Label.Label2.Text = "Yes"
+				warn("apps/user found")
 			end
 		else
 			warn("No apps/user found")
