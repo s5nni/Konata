@@ -115,7 +115,7 @@ getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Sync", function()
 end)
 
 ---------------------------------------------
-Config.Settings.Account.Sync_Cloud = Sections.Account:AddDualLabel({"Sync:", "No"})
+Config.Settings.Account.Label = Sections.Account:AddDualLabel({"Sync:", "No"})
 Sections.Account:AddToggle("Sync Cloud", {flag = "Toggle_Flag", default = false}, function(bool)
 	Config.Settings.Account.Sync_Cloud.Enabled = bool
 end)
