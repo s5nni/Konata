@@ -96,18 +96,20 @@ getgenv().__Mitulib.Runtime.RunLoops:BindToHeartbeat("Sync", function()
 		local appsData = getgenv().__Mitulib.Database:Get("Apps/"..game.PlaceId)
 		local userData = getgenv().__Mitulib.Database:Get("Users/"..gethwid())
 		if appsData and userData then
-			if userData.Connections[getgenv().__Mitulib.Runtime.LocalPlayer.UserId].Cloud[appsData.Type] then
+			local userId = tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)
+			local cloudTable = userData.Connections and userData.Connections[userId] and userData.Connections[userId].Cloud
+			if cloudTable and cloudTable[appsData.Type] then
 				Config.Settings.Account.Label.Label2.Text = "Yes"
 			end
 		else
 			warn("No apps/user found")
+			canUpdate = false
 			return
 		end
 		local hwid = gethwid()
 		local userId = tostring(getgenv().__Mitulib.Runtime.LocalPlayer.UserId)
-		local placeId = game.PlaceId
-		local connPath = "Users/" .. hwid .. "/Connections/" .. userId .. "/Cloud/" .. appsData.Type
-		getgenv().__Mitulib.Database:Patch(connPath, Config)
+		local cloudPath = "Users/" .. hwid .. "/Connections/" .. userId .. "/Cloud/" .. appsData.Type
+		getgenv().__Mitulib.Database:Patch(cloudPath, Config)
 		canUpdate = false
 	end
 end)
