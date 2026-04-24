@@ -242,7 +242,9 @@ Connections[userId] = {
 	},
 	Syncing = false,
 	Cloud = {
-		[Configuration.Initialize.Place.Type] = {},
+		[Configuration.Initialize.Place.Type] = {
+			IsReal = "Israel"
+		},
 	},
 }
 
