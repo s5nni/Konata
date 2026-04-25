@@ -117,9 +117,10 @@ local function getLevelNames(chapter)
 end
 
 local Window = getgenv().__Mitulib.Source:AddWindow({
-	title   = { "Mitu", "Konata (Lobby)" },
+	title   = { "Mitu", "Konata" },
 	theme   = { Accent = Color3.fromRGB(80, 125, 215) },
 	key     = Enum.KeyCode.E,
+	extrakey = Enum.KeyCode.Q,
 	default = false,
 })
 
@@ -221,35 +222,74 @@ SubSections.Options:AddToggle("IsPre-PublishPlace",  { default = false }, functi
 
 Config.State.StatusDual = SubSections.Actions:AddDualLabel({ "Status:", "Idle." })
 
-SubSections.Actions:AddButton("Create Room", function()
-	local ok, err = pcall(function() RoomControl:InvokeServer(buildArgs("createRoom")) end)
+local List = {}
+local Actions = {}
+
+Actions["Create"] = function()
+	local ok, err = pcall(function()
+		RoomControl:InvokeServer(buildArgs("createRoom"))
+	end)
 	setStatus(ok and "Room Created." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
 	if not ok then warn("[Mitu] CreateRoom:", err) end
-end)
+	return ok
+end
 
-SubSections.Actions:AddButton("Update Room", function()
-	local ok, err = pcall(function() RoomControl:InvokeServer(buildArgs("updateRoom")) end)
+Actions["Update"] = function()
+	local ok, err = pcall(function()
+		RoomControl:InvokeServer(buildArgs("updateRoom"))
+	end)
 	setStatus(ok and "Room Updated." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
 	if not ok then warn("[Mitu] UpdateRoom:", err) end
-end)
+	return ok
+end
 
-SubSections.Actions:AddButton("Check Room", function()
+Actions["Check"] = function()
 	local exists = checkRoom()
 	setStatus(exists and "Room Exists." or "No Room.", exists and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 165, 0))
-end)
+	return exists
+end
 
-SubSections.Actions:AddButton("Exit Room", function()
-	local ok, err = pcall(function() RoomControl:InvokeServer(buildArgs("removePlayer")) end)
+Actions["Leave"] = function()
+	local ok, err = pcall(function()
+		RoomControl:InvokeServer(buildArgs("removePlayer"))
+	end)
 	setStatus(ok and "Exited Room." or "Failed.", ok and Color3.fromRGB(255, 165, 0) or Color3.fromRGB(255, 0, 0))
 	if not ok then warn("[Mitu] ExitRoom:", err) end
-end)
+	return ok
+end
 
-SubSections.Actions:AddButton("Start Room", function()
+Actions["Start"] = function()
 	local ok, err = pcall(function()
 		RoomControl:InvokeServer({ Type = "play" })
 	end)
 	setStatus(ok and "Game Started." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
 	if not ok then warn("[Mitu] StartGame:", err) end
+	return ok
+end
+
+SubSections.Actions:AddPriority("Choose Sequence", {"Create", "Update", "Start", "Leave"}, {exclude = true}, function(va)
+	List = va
+end)
+
+SubSections.Actions:AddButton("Launch", function()
+	if #List == 0 then
+		setStatus("No sequence selected.", Color3.fromRGB(255, 165, 0))
+		return
+	end
+
+	for i, actionName in ipairs(List) do
+		local action = Actions[actionName]
+		if action then
+			print(string.format("[Mitu] Step %d/%d: %s", i, #List, actionName))
+			local success = action()
+			if not success then
+				warn(string.format("[Mitu] Sequence halted at '%s' (step %d)", actionName, i))
+				break
+			end
+		else
+			warn(string.format("[Mitu] Unknown action in sequence: %s", tostring(actionName)))
+		end
+	end
 end)
 
 Window.Frame.Topbar.Konata.Visible = true
