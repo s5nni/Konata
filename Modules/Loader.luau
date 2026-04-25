@@ -164,14 +164,36 @@ end
 
 local Auth      = { Authenticated = true }
 local isPremium = ""
+local canAcess = false
 
 if not skipAuth then
-	Auth = getgenv().__Mitulib.Source:Auth({
-		Key     = currentKey,
-		Discord = "https://discord.gg/AVEQCfng",
-		Icon    = "rbxassetid://101639538453544",
+	Auth = getgenv().__Mitulib.Source:AddAuthentication({
+		Key = currentKey,
+		Method = "Key",
+		Icon = "80203530127401"
 	})
-	repeat task.wait(1) until Auth.Authenticated == true
+	
+	Auth:OnSubmit(function()
+		local method = Auth:GetActiveMethod()
+		local authenticated = Auth:IsAuthenticated()
+		local input = Auth:GetInput()
+
+		if method == "Key" then
+			if authenticated then
+				Auth:Close()
+				canAcess = true
+			end
+
+		elseif method == "Token" then
+			local databaseToken = "tokentest"
+			if input == databaseToken then
+				canAcess = true
+				Auth:Close()
+			end
+		end
+	end)
+	
+	repeat task.wait(1) until canAcess == true
 
 elseif skipReason == "premium" then
 	isPremium = " (Premium)"
