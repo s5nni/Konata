@@ -154,11 +154,6 @@ local function buildArgs(type)
 	}
 end
 
-local function setStatus(text, color)
-	Config.State.StatusDual:SetRightText(text)
-	Config.State.StatusDual.Label2.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-end
-
 local function checkRoom()
 	local ok, result = pcall(function()
 		return RoomControl:InvokeServer(buildArgs("updateRoom"))
@@ -220,17 +215,17 @@ SubSections.Options:AddToggle("Friends Only",        { default = false }, functi
 SubSections.Options:AddToggle("IsTestPlace",         { default = false }, function(val) Config.Room.IsTestPlace  = val end)
 SubSections.Options:AddToggle("IsPre-PublishPlace",  { default = false }, function(val) Config.Room.IsPrePublish = val end)
 
-Config.State.StatusDual = SubSections.Actions:AddDualLabel({ "Status:", "Idle." })
-
 local List = {}
 local Actions = {}
+
+local Terminal = SubSections.Actions:AddTerminal("Logs", {extend = 100})
 
 Actions["Create"] = function()
 	local ok, err = pcall(function()
 		RoomControl:InvokeServer(buildArgs("createRoom"))
 	end)
-	setStatus(ok and "Room Created." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-	if not ok then warn("[Mitu] CreateRoom:", err) end
+	Terminal:Add(ok and "Room Created." or "Failed.", {type = ok and "success" or "error"})
+	if not ok then Terminal:Add("Faliure: "..err, {type = "error"}) end
 	return ok
 end
 
@@ -238,14 +233,14 @@ Actions["Update"] = function()
 	local ok, err = pcall(function()
 		RoomControl:InvokeServer(buildArgs("updateRoom"))
 	end)
-	setStatus(ok and "Room Updated." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-	if not ok then warn("[Mitu] UpdateRoom:", err) end
+	Terminal:Add(ok and "Room Updated." or "Failed.", {type = ok and "success" or "error"})
+	if not ok then Terminal:Add("Faliure: "..err, {type = "error"}) end
 	return ok
 end
 
 Actions["Check"] = function()
 	local exists = checkRoom()
-	setStatus(exists and "Room Exists." or "No Room.", exists and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 165, 0))
+	Terminal:Add(exists and "Room Exists." or "No Room.", {type = "feed"})
 	return exists
 end
 
@@ -253,8 +248,8 @@ Actions["Leave"] = function()
 	local ok, err = pcall(function()
 		RoomControl:InvokeServer(buildArgs("removePlayer"))
 	end)
-	setStatus(ok and "Exited Room." or "Failed.", ok and Color3.fromRGB(255, 165, 0) or Color3.fromRGB(255, 0, 0))
-	if not ok then warn("[Mitu] ExitRoom:", err) end
+	Terminal:Add(ok and "Exited Room." or "Failed.", {type = ok and "success" or "error"})
+	if not ok then Terminal:Add("Faliure: "..err, {type = "error"}) end
 	return ok
 end
 
@@ -262,8 +257,8 @@ Actions["Start"] = function()
 	local ok, err = pcall(function()
 		RoomControl:InvokeServer({ Type = "play" })
 	end)
-	setStatus(ok and "Game Started." or "Failed.", ok and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-	if not ok then warn("[Mitu] StartGame:", err) end
+	Terminal:Add(ok and "Game Started." or "Failed.", {type = ok and "success" or "error"})
+	if not ok then Terminal:Add("Faliure: "..err, {type = "error"}) end
 	return ok
 end
 
@@ -273,7 +268,7 @@ end)
 
 SubSections.Actions:AddButton("Launch", function()
 	if #List == 0 then
-		setStatus("No sequence selected.", Color3.fromRGB(255, 165, 0))
+		Terminal:Add("No sequence selected.", {type = "error"})
 		return
 	end
 
