@@ -1,84 +1,231 @@
-local Library = {}
+local Database = {}
+Database.__index = Database
+
 local HttpService = game:GetService("HttpService")
 
 if not request then
-	warn("[Library] 'request' function not found — ensure you're using a compatible executor")
+	warn("[Database] 'request' function not found, ensure you're using a compatible executor")
 end
 
-Library.Configuration = {
-	Url = "",
-	Secret = "",
-}
 
-function Library:decodeJson(raw)
+--  Constructor
+function Database:New(options)
+	local instance = setmetatable({}, Database)
+	instance.Configuration = { Url = "", Secret = "" }
+	if options then
+		instance:SetConfiguration(options)
+	end
+	return instance
+end
+
+--  Configuration
+function Database:SetConfiguration(options)
+	assert(type(options) == "table", "[Database] SetConfiguration: options must be a table")
+	if options.Url ~= nil then
+		assert(type(options.Url) == "string", "[Database] SetConfiguration: Url must be a string")
+		self.Configuration.Url = options.Url
+	end
+	if options.Secret ~= nil then
+		assert(type(options.Secret) == "string", "[Database] SetConfiguration: Secret must be a string")
+		self.Configuration.Secret = options.Secret
+	end
+end
+
+--  Internal Helpers
+function Database:_validateConfig()
+	local c = self.Configuration
+	if c.Url == "" or c.Secret == "" then
+		warn("[Database] Configuration incomplete, call :SetConfiguration({ Url = ..., Secret = ... })")
+		return false
+	end
+	return true
+end
+
+-- Normalises path and appends .json + auth query param
+function Database:_buildUrl(path, extraParams)
+	local c = self.Configuration
+	if path:sub(1, 1) ~= "/" then path = "/" .. path end
+	local url = c.Url .. path .. ".json?auth=" .. c.Secret
+	if extraParams then url = url .. "&" .. extraParams end
+	return url
+end
+
+function Database:_decode(raw)
+	if raw == nil or raw == "" or raw == "null" then return nil end
 	local ok, result = pcall(HttpService.JSONDecode, HttpService, raw)
-	return ok and result or nil
+	if not ok then
+		warn("[Database] Failed to decode JSON: " .. tostring(result))
+		return nil
+	end
+	return result
 end
 
-function Library:_request(method, path, data)
-	local config = self.Configuration or {}
-	if config.Url == "" or config.Secret == "" then
-		if Configuration and Configuration.Initialize and Configuration.Initialize.FireBase then
-			config = Configuration.Initialize.FireBase
-		else
-			warn("[Library] Firebase configuration missing, set Library.Configuration.Url and .Secret")
-			return nil
-		end
+function Database:_encode(data)
+	local ok, result = pcall(HttpService.JSONEncode, HttpService, data)
+	if not ok then
+		warn("[Database] Failed to encode JSON: " .. tostring(result))
+		return nil
 	end
+	return result
+end
 
-	local url = config.Url .. path .. ".json?auth=" .. config.Secret
+-- Core HTTP dispatcher; returns the raw response object or nil
+function Database:_request(method, path, data, extraParams)
+	if not self:_validateConfig() then return nil end
 
+	local url  = self:_buildUrl(path, extraParams)
 	local body = nil
-	if data then
-		local ok, encoded = pcall(HttpService.JSONEncode, HttpService, data)
-		if not ok then
-			warn("[Library] Failed to encode JSON: " .. tostring(encoded))
-			return nil
-		end
-		body = encoded
+
+	if data ~= nil then
+		body = self:_encode(data)
+		if body == nil then return nil end
 	end
 
-	local success, response = pcall(request, {
+	local ok, response = pcall(request, {
 		Url     = url,
 		Method  = method,
 		Headers = { ["Content-Type"] = "application/json" },
 		Body    = body,
 	})
 
-	if not success then
-		warn("[Library] Request error: " .. tostring(response))
+	if not ok then
+		warn("[Database] Request failed: " .. tostring(response))
 		return nil
 	end
 
-	if response and response.StatusCode == 200 then
-		if method == "GET" and response.Body then
-			return Library:decodeJson(response.Body)
-		end
-		return true
+	local status = response and response.StatusCode or 0
+
+	-- Firebase DELETE returns 200 with body "null", treat as success
+	if status == 200 then
+		return response
 	end
 
-	warn(string.format("[Library] Firebase %s failed, HTTP %d", method, response and response.StatusCode or 0))
+	warn(string.format("[Database] %s /%s, HTTP %d", method, path, status))
 	return nil
 end
 
-function Library:Get(path)
-	assert(type(path) == "string", "path must be a string")
-	return Library:_request("GET", path)
+--  Read Methods
+function Database:Get(path)
+	assert(type(path) == "string", "[Database] Get: path must be a string")
+	local response = self:_request("GET", path)
+	if not response then return nil end
+	return self:_decode(response.Body)
 end
 
-function Library:Set(path, data)
-	assert(type(path) == "string", "path must be a string")
-	return Library:_request("PUT", path, data)
+function Database:GetRaw(path)
+	assert(type(path) == "string", "[Database] GetRaw: path must be a string")
+	local response = self:_request("GET", path)
+	if not response then return nil end
+	return response.Body
 end
 
-function Library:Patch(path, data)
-	assert(type(path) == "string", "path must be a string")
-	return Library:_request("PATCH", path, data)
+function Database:Keys(path)
+	assert(type(path) == "string", "[Database] Keys: path must be a string")
+	local response = self:_request("GET", path, nil, "shallow=true")
+	if not response then return nil end
+
+	local data = self:_decode(response.Body)
+	if type(data) ~= "table" then return {} end
+
+	local keys = {}
+	for k in pairs(data) do
+		table.insert(keys, k)
+	end
+	return keys
 end
 
-function Library:Push(path, data)
-	assert(type(path) == "string", "path must be a string")
-	return Library:_request("POST", path, data)
+function Database:Exists(path)
+	assert(type(path) == "string", "[Database] Exists: path must be a string")
+	return self:Get(path) ~= nil
 end
 
-return Library
+--  Write Methods
+function Database:Set(path, data)
+	assert(type(path) == "string", "[Database] Set: path must be a string")
+	return self:_request("PUT", path, data) ~= nil
+end
+
+function Database:Patch(path, data)
+	assert(type(path) == "string", "[Database] Patch: path must be a string")
+	assert(type(data) == "table",  "[Database] Patch: data must be a table")
+	return self:_request("PATCH", path, data) ~= nil
+end
+
+function Database:Push(path, data)
+	assert(type(path) == "string", "[Database] Push: path must be a string")
+	local response = self:_request("POST", path, data)
+	if not response then return nil end
+	local result = self:_decode(response.Body)
+	-- Firebase returns { name = "-autoGeneratedKey" }
+	return result and result.name or nil
+end
+
+function Database:Delete(path)
+	assert(type(path) == "string", "[Database] Delete: path must be a string")
+	return self:_request("DELETE", path) ~= nil
+end
+
+--  Utility Methods
+function Database:Increment(path, amount)
+	assert(type(path) == "string", "[Database] Increment: path must be a string")
+	amount = amount or 1
+	assert(type(amount) == "number", "[Database] Increment: amount must be a number")
+
+	local current = self:Get(path)
+	local base    = type(current) == "number" and current or 0
+	return self:Set(path, base + amount)
+end
+
+function Database:Transaction(path, callback)
+	assert(type(path) == "string",      "[Database] Transaction: path must be a string")
+	assert(type(callback) == "function","[Database] Transaction: callback must be a function")
+
+	local current  = self:Get(path)
+	local newValue = callback(current)
+
+	if newValue == nil then
+		return false  -- caller chose to abort
+	end
+
+	return self:Set(path, newValue)
+end
+
+function Database:Listen(path, callback, interval)
+	assert(type(path) == "string",       "[Database] Listen: path must be a string")
+	assert(type(callback) == "function", "[Database] Listen: callback must be a function")
+	interval = math.max(interval or 3, 1)
+
+	local self_ref  = self
+	local running   = true
+	local lastJson  = nil
+
+	local handle = {}
+	function handle:Stop()
+		running = false
+	end
+
+	task.spawn(function()
+		while running do
+			local value = self_ref:Get(path)
+
+			-- Serialise to JSON for a simple deep-equality check
+			local currentJson
+			if value ~= nil then
+				local ok, encoded = pcall(HttpService.JSONEncode, HttpService, value)
+				currentJson = ok and encoded or nil
+			end
+
+			if currentJson ~= lastJson then
+				local oldDecoded = lastJson and self_ref:_decode(lastJson) or nil
+				callback(value, oldDecoded)
+				lastJson = currentJson
+			end
+
+			task.wait(interval)
+		end
+	end)
+
+	return handle
+end
+
+return Database
