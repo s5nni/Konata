@@ -25,9 +25,11 @@ if getgenv().__Mitulib.Encode == nil then
 end
 
 if getgenv().__Mitulib.Database == nil then
-	getgenv().__Mitulib.Database = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Database.luau", false))()
-	getgenv().__Mitulib.Database.Configuration.Url = "https://mitu-gg-default-rtdb.firebaseio.com/"
-	getgenv().__Mitulib.Database.Configuration.Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX"
+	local DatabaseLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Database.luau", false))()
+	getgenv().__Mitulib.Database = DatabaseLib:New({
+		Url    = "https://mitu-gg-default-rtdb.firebaseio.com",
+		Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX",
+	})
 end
 
 local Configuration = {
