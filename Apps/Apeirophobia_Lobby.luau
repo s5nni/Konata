@@ -1,10 +1,12 @@
 -- Protection layer from direct execution.
 local keyVararg, lenVararg = ... or nil, nil
-if keyVararg == nil or lenVararg == nil then return end
+if keyVararg == nil or lenVararg == nil then error("Failure: 4") return end
+
+print(keyVararg, lenVararg)
 
 -- Checks and collect Apps Data
 local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
-if AppsExists == false then return end
+if AppsExists == false then error("Failure: 1") return end
 
 local Apps = getgenv().__Mitulib.Database:Get("Apps")
 local placeData = nil
@@ -19,11 +21,11 @@ for ID, Data in next, Apps do
 end
 
 -- Check if Data was found
-if placeData == nil then getgenv().__Mitulib.Reason = "Not provided." return end
+if placeData == nil then error("Failure: 2") return end
 
 -- Decode Key
 local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Settings.Seed, lenVararg)
-if newKey ~= placeData.Settings.Key then return end
+if newKey ~= placeData.Settings.Key then  error("Failure: 3") return end
 ---------------------------------------------------
 
 ---------------------------------------------------
