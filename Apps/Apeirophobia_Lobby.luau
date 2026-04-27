@@ -1,67 +1,32 @@
 -- Protection layer from direct execution.
-local __Key, __Length = ... or "Not provided.", nil
+local keyVararg, lenVararg = ... or nil, nil
+if keyVararg == nil or lenVararg == nil then return end
 
-local __Data = getgenv().__Mitulib.Database:Get("Apps")
-if type(__Data) ~= "table" then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
-end
-local placeId = tostring(game.PlaceId)
-local placeData = __Data[placeId]
-if type(placeData) ~= "table" then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
-end
-local settings = placeData.Settings
-if type(settings) ~= "table" then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
-end
-local seed = settings.Seed
-if type(seed) ~= "string" then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
-end
-if type(__Key) ~= "string" then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
-end
-local __DecodedKey = getgenv().__Mitulib.Encode.Decode(__Key, seed, __Length)
-if __DecodedKey ~= placeData.Key then
-	getgenv().__Mitulib.Source:Notify({
-		title    = "Konata",
-		text     = "Failure.\n"..__Key,
-		color    = Color3.fromRGB(215, 80, 80),
-		duration = 5,
-	})
-	return
+-- Checks and collect Apps Data
+local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
+if AppsExists == false then return end
+
+local Apps = getgenv().__Mitulib.Database:Get("Apps")
+local placeData = nil
+
+-- Search for matching place ID
+for ID, Data in next, Apps do
+	local newID = tonumber(ID)
+	if game.PlaceId == newID then
+		placeData = Data
+		break
+	end
 end
 
+-- Check if Data was found
+if placeData == nil then getgenv().__Mitulib.Reason = "Not provided." return end
+
+-- Decode Key
+local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Settings.Seed, lenVararg)
+if newKey ~= placeData.Settings.Key then return end
+---------------------------------------------------
+
+---------------------------------------------------
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
 __ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
