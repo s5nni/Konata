@@ -28,6 +28,8 @@ local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Settings.S
 if newKey ~= placeData.Settings.Key then  error("Failure: 3") return end
 ---------------------------------------------------
 
+print("Yay")
+
 ---------------------------------------------------
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
