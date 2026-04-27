@@ -1,5 +1,5 @@
 -- Protection layer from direct execution.
-local keyVararg, lenVararg = ... or nil, nil
+local keyVararg, lenVararg = ...
 if keyVararg == nil or lenVararg == nil then error("Failure: 4") return end
 
 print(keyVararg, lenVararg)
@@ -27,8 +27,6 @@ if placeData == nil then error("Failure: 2") return end
 local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Settings.Seed, lenVararg)
 if newKey ~= placeData.Settings.Key then  error("Failure: 3") return end
 ---------------------------------------------------
-
-print("Yay")
 
 ---------------------------------------------------
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
