@@ -2,8 +2,6 @@
 local keyVararg = ...
 if keyVararg == nil then error("Failure: 4") return end
 
-print("Rec:", keyVararg)
-
 -- Checks and collect Apps Data
 local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
 if AppsExists == false then error("Failure: 1") return end
@@ -25,7 +23,7 @@ if placeData == nil then error("Failure: 2") return end
 
 -- Decode Key
 local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Place.Seed)
-if newKey ~= placeData.Settings.Key then print(newKey, placeData.Settings.Key) error("Failure: 3") return end
+if newKey ~= placeData.Settings.Key then return end
 ---------------------------------------------------
 
 ---------------------------------------------------
