@@ -35,14 +35,14 @@ end
 
 -- Checks and fire Settings Data
 local SettingsExists = getgenv().__Mitulib.Database:Exists("Settings")
-if SettingsExists == false then return end
+if SettingsExists == false then error() return end
 
 local Settings = getgenv().__Mitulib.Database:Get("Settings")
-if Settings.AllowLaunching == false then return end
+if Settings.AllowLaunching == false then error() return end
 
 -- Checks and collect Apps Data
 local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
-if AppsExists == false then return end
+if AppsExists == false then error() return end
 
 local Apps = getgenv().__Mitulib.Database:Get("Apps")
 local placeData = nil
@@ -57,18 +57,18 @@ for ID, Data in next, Apps do
 end
 
 -- Check if Data was found
-if placeData == nil then getgenv().__Mitulib.Reason = "Not provided." return end
+if placeData == nil then error() getgenv().__Mitulib.Reason = "Not provided." return end
 
 -- Check and collect Users data
 local UserExists = getgenv().__Mitulib.Database:Exists("Users")
-if UserExists == false then getgenv().__Mitulib.Reason = "Not provided." return end
+if UserExists == false then error() getgenv().__Mitulib.Reason = "Not provided." return end
 
 local canAcess = false
 Authentication = getgenv().__Mitulib.Source:AddAuthentication({
 	Key = placeData.Settings.Key,
 	Method = "Key",
 	Icon = "80203530127401",
-	Locked = true,
+	Lock = true,
 })
 
 -- Authentication
