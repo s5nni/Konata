@@ -67,7 +67,8 @@ local canAcess = false
 Authentication = getgenv().__Mitulib.Source:AddAuthentication({
 	Key = placeData.Settings.Key,
 	Method = "Key",
-	Icon = "80203530127401"
+	Icon = "80203530127401",
+	Locked = true,
 })
 
 -- Authentication
