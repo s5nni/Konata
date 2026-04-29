@@ -7,7 +7,7 @@ local isConnected = {false, conn = nil}
 
 function Queue:SetSource(vararg)
 	if type(vararg) ~= "string" or vararg == "" then return end
-	Source = vararg
+	Source = "repeat wait() until game:IsLoaded()\n" .. vararg
 end
 
 function Queue:GetSource()
