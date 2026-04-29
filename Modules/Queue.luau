@@ -2,7 +2,7 @@ assert(queue_on_teleport, "Your executor does not support this method.")
 
 local Queue = {}
 local LocalPlayer = game:GetService("Players").LocalPlayer
-local Source = ""
+local Source = nil
 local isConnected = {false, conn = nil}
 
 function Queue:SetSource(vararg)
