@@ -18,7 +18,7 @@ function Queue:Connect()
 	if isConnected[1] == true then return end
 	isConnected[1] = true
 	isConnected.conn = LocalPlayer.OnTeleport:Connect(function(TeleportState)
-		if TeleportState == Enum.TeleportState.Started then
+		if TeleportState == Enum.TeleportState.InProgress then
 			queue_on_teleport(Source)
 		end
 	end)
