@@ -2,6 +2,8 @@
 local keyVararg = ...
 if keyVararg == nil then error("Failure: 4") return end
 
+print("Rec:", keyVararg)
+
 -- Checks and collect Apps Data
 local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
 if AppsExists == false then error("Failure: 1") return end
@@ -23,10 +25,15 @@ if placeData == nil then error("Failure: 2") return end
 
 -- Decode Key
 local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Place.Seed)
-if newKey ~= placeData.Settings.Key then return end
+if newKey ~= placeData.Settings.Key then print(newKey, placeData.Settings.Key) error("Failure: 3") return end
 ---------------------------------------------------
 
 ---------------------------------------------------
+if getgenv().__Mitulib.Queue == nil then
+	getgenv().__Mitulib.Queue = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Queue.luau"))()
+	getgenv().__Mitulib.__Queue = getgenv().__Mitulib.Queue:SetSource("loadstring(game:HttpGet('https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Loader.luau', false))()")
+end
+
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
 __ScreenGui.DisplayOrder = -10
 __ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
@@ -254,6 +261,15 @@ end)
 
 SubSections.Actions:AddButton("Clear Logs", function()
 	Terminal:Reset()
+end)
+
+
+Sections.Account:AddToggle("Auto-Launch", {default = false}, function(bool)
+	if bool == true then
+		getgenv().__Mitulib.__Queue:Connect()
+	elseif bool == false then
+		getgenv().__Mitulib.__Queue:Disconnect()
+	end
 end)
 
 Window.Frame.Topbar.Konata.Visible = true
