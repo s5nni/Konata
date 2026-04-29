@@ -31,7 +31,6 @@ if newKey ~= placeData.Settings.Key then print(newKey, placeData.Settings.Key) e
 ---------------------------------------------------
 if getgenv().__Mitulib.Queue == nil then
 	getgenv().__Mitulib.Queue = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Queue.luau"))()
-	getgenv().__Mitulib.__Queue = getgenv().__Mitulib.Queue:SetSource("loadstring(game:HttpGet('https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Loader.luau', false))()")
 end
 
 local __ScreenGui = getgenv().__Mitulib.Source:GetScreenGui()
@@ -263,12 +262,16 @@ SubSections.Actions:AddButton("Clear Logs", function()
 	Terminal:Reset()
 end)
 
-
+local Queue = getgenv().__Mitulib.Queue
 Sections.Account:AddToggle("Auto-Launch", {default = false}, function(bool)
+	Queue:SetSource("loadstring(game:HttpGet('https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Loader.luau', false))()")
+
 	if bool == true then
-		getgenv().__Mitulib.__Queue:Connect()
+		if Queue:GetSource() == nil then return end
+		Queue:Connect()
 	elseif bool == false then
-		getgenv().__Mitulib.__Queue:Disconnect()
+		if Queue:GetSource() == nil then return end
+		Queue:Disconnect()
 	end
 end)
 
