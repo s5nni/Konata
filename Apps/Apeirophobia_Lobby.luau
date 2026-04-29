@@ -2,8 +2,6 @@
 local keyVararg = ...
 if keyVararg == nil then error("Failure: 4") return end
 
-print("Rec:", keyVararg)
-
 -- Checks and collect Apps Data
 local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
 if AppsExists == false then error("Failure: 1") return end
