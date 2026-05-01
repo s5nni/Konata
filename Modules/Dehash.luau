@@ -1,261 +1,404 @@
-if getgenv().__RemoteMapper then
-    return getgenv().Dehash
+if getgenv().__DehashLoaded then
+	return print(string.rep("\nDehasher: Already loaded\n", 100))
 end
-getgenv().__RemoteMapper = true
+getgenv().__DehashLoaded = true
 
-local RemoteMap = {}
-local Remotes = {}
-local BlockedRemotes = {}
-local ForcedRemotes = {}
-local SearchStorage = {game:GetService("ReplicatedStorage")}
+------------------------------------------------------------------------
+-- CORE TABLES
+------------------------------------------------------------------------
+local Dehash = {}
+Dehash.StoredRemotes  = {}
+Dehash.ForcedRemotes  = {}
+Dehash.BlockedRemotes = {}
+Dehash.SpiedRemotes   = {}
+Dehash.OnCallRemotes  = {}
 
-local function register(remote, realName)
-    if not (remote and remote.Parent) then return end
-    if typeof(remote) ~= "Instance" then return end
-    if type(realName) ~= "string" or realName == "" then return end
-    RemoteMap[remote] = realName
-    Remotes[realName] = remote
-end
-
-local function scanGC()
-    for _, v in pairs(getgc(true)) do
-        if type(v) == "table" then
-            local remote = rawget(v, "Remote")
-            local name = rawget(v, "Name")
-            if typeof(remote) == "Instance" and type(name) == "string" and name ~= "" then
-                register(remote, name)
-            end
-        end
-    end
+------------------------------------------------------------------------
+-- INTERNAL HELPERS
+------------------------------------------------------------------------
+local function isValidRemote(obj)
+	return typeof(obj) == "Instance"
+		and obj.Parent ~= nil
+		and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction"))
 end
 
-local function scanStorage()
-    for _, storage in ipairs(SearchStorage) do
-        pcall(function()
-            for _, obj in ipairs(storage:GetDescendants()) do
-                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                    register(obj, RemoteMap[obj] or obj.Name)
-                end
-            end
-            storage.DescendantAdded:Connect(function(obj)
-                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                    task.spawn(function()
-                        local timeout = tick() + 5
-                        while obj.Parent and tick() < timeout do
-                            local realName = RemoteMap[obj]
-                            if realName then
-                                register(obj, realName)
-                                return
-                            end
-                            task.wait(0.1)
-                        end
-                        if obj and obj.Parent then
-                            register(obj, obj.Name)
-                        end
-                    end)
-                end
-            end)
-        end)
-    end
+local function getEntry(name)
+	return Dehash.StoredRemotes[name]
 end
 
-do
-    local mt = getrawmetatable(game)
-    local oldNewIndex = mt.__newindex
-    setreadonly(mt, false)
-    mt.__newindex = newcclosure(function(t, k, v)
-        if k == "Remote" and typeof(v) == "Instance" then
-            local realName = rawget(t, "Name")
-            if type(realName) == "string" and realName ~= "" then
-                task.defer(register, v, realName)
-            end
-        end
-        return oldNewIndex(t, k, v)
-    end)
-    setreadonly(mt, true)
+local function makeEntry(remote)
+	return {
+		Remote = remote,
+		Path   = remote:GetFullName(),
+		Class  = remote.ClassName,
+	}
 end
 
+local function attachCleanup(name, remote)
+	remote.Destroying:Connect(function()
+		Dehash.StoredRemotes[name]  = nil
+		Dehash.BlockedRemotes[name] = nil
+		Dehash.ForcedRemotes[name]  = nil
+		Dehash.SpiedRemotes[name]   = nil
+		Dehash.OnCallRemotes[name]  = nil
+	end)
+end
+
+------------------------------------------------------------------------
+-- CENTRALIZED NAMECALL HOOK
+-- Single hook handles: blocking, forcing, spying, onCall dispatch
+------------------------------------------------------------------------
 local originalNamecall
 originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if method == "FireServer" or method == "InvokeServer" then
-        local realName = RemoteMap[self] or self.Name
+	local method = getnamecallmethod()
 
-        if BlockedRemotes[realName] then
-            return
-        end
+	if method == "FireServer" or method == "InvokeServer" then
+		-- find matching entry by remote instance
+		local matchedName
+		for name, entry in pairs(Dehash.StoredRemotes) do
+			if entry.Remote == self then
+				matchedName = name
+				break
+			end
+		end
 
-        local args = {...}
+		if matchedName then
+			-- blocking
+			if Dehash.BlockedRemotes[matchedName] then
+				return
+			end
 
-        if ForcedRemotes[realName] then
-            local forceData = ForcedRemotes[realName]
-            for index, value in pairs(forceData.args) do
-                args[index] = value
-            end
-            return originalNamecall(self, table.unpack(args))
-        end
-    end
-    return originalNamecall(self, ...)
+			local args = { ... }
+
+			-- spy dispatch (non blocking, runs in separate thread)
+			local spyEntry = Dehash.SpiedRemotes[matchedName]
+			if spyEntry and spyEntry.active then
+				task.spawn(spyEntry.callback, #args > 0 and args or nil)
+			end
+
+			-- onCall dispatch
+			local callEntry = Dehash.OnCallRemotes[matchedName]
+			if callEntry and callEntry.active then
+				task.spawn(callEntry.callback)
+			end
+
+			-- forcing (merges only specified indexes)
+			local forceEntry = Dehash.ForcedRemotes[matchedName]
+			if forceEntry and forceEntry.active then
+				for index, value in pairs(forceEntry.args) do
+					args[index] = value
+				end
+				return originalNamecall(self, table.unpack(args))
+			end
+		end
+	end
+
+	return originalNamecall(self, ...)
 end))
 
-task.spawn(function()
-    task.wait(2)
-    scanGC()
-    scanStorage()
-end)
+------------------------------------------------------------------------
+-- ScanPath
+-- manually scans a target instance and registers all remotes inside it
+------------------------------------------------------------------------
+function Dehash:ScanPath(target)
+	assert(typeof(target) == "Instance", "Dehash:ScanPath - expected Instance, got " .. typeof(target))
 
-task.spawn(function()
-    while true do
-        task.wait(5)
-        scanGC()
-    end
-end)
+	local found = 0
+	local function scanDescendants(obj)
+		for _, child in ipairs(obj:GetDescendants()) do
+			if isValidRemote(child) then
+				local name = child.Name
+				-- avoid duplicate overwrite, append path suffix if name collides
+				if self.StoredRemotes[name] and self.StoredRemotes[name].Remote ~= child then
+					name = child:GetFullName()
+				end
+				if not self.StoredRemotes[name] then
+					self.StoredRemotes[name] = makeEntry(child)
+					attachCleanup(name, child)
+					found += 1
+				end
+			end
+		end
+	end
 
-local Dehash = {}
+	pcall(scanDescendants, target)
 
-function Dehash:GetRemotes()
-    local copy = {}
-    for name, remote in pairs(Remotes) do
-        copy[name] = remote
-    end
-    return copy
+	-- watch for new remotes added after scan
+	target.DescendantAdded:Connect(function(child)
+		if isValidRemote(child) then
+			local name = child.Name
+			if self.StoredRemotes[name] and self.StoredRemotes[name].Remote ~= child then
+				name = child:GetFullName()
+			end
+			if not self.StoredRemotes[name] then
+				self.StoredRemotes[name] = makeEntry(child)
+				attachCleanup(name, child)
+			end
+		end
+	end)
+
+	print("Dehash:ScanPath - found " .. found .. " remotes in " .. target:GetFullName())
 end
 
+------------------------------------------------------------------------
+-- ClearCache
+-- clears specified cache tables
+-- usage: Dehash:ClearCache({"Stored", "Blocked"})
+------------------------------------------------------------------------
+function Dehash:ClearCache(options)
+	local map = {
+		Stored  = "StoredRemotes",
+		Forced  = "ForcedRemotes",
+		Blocked = "BlockedRemotes",
+		Spied   = "SpiedRemotes",
+		OnCall  = "OnCallRemotes",
+	}
+	for _, key in ipairs(options) do
+		local field = map[key]
+		if field then
+			table.clear(self[field])
+			print("Dehash:ClearCache - cleared " .. key)
+		else
+			warn("Dehash:ClearCache - unknown option: " .. tostring(key))
+		end
+	end
+end
+
+------------------------------------------------------------------------
+-- FireRemote
+-- fires a remote by name using indexed args table
+-- args are not required
+------------------------------------------------------------------------
+function Dehash:FireRemote(name, args)
+	local entry = getEntry(name)
+	if not entry or not isValidRemote(entry.Remote) then
+		warn("Dehash:FireRemote - remote not found: " .. tostring(name))
+		return
+	end
+	if self.BlockedRemotes[name] then
+		warn("Dehash:FireRemote - remote is blocked: " .. name)
+		return
+	end
+
+	local packed = {}
+	if args then
+		for index, value in pairs(args) do
+			packed[index] = value
+		end
+	end
+
+	if entry.Remote:IsA("RemoteEvent") then
+		entry.Remote:FireServer(table.unpack(packed))
+	elseif entry.Remote:IsA("RemoteFunction") then
+		return entry.Remote:InvokeServer(table.unpack(packed))
+	end
+end
+
+------------------------------------------------------------------------
+-- BlockRemote
+-- blocks or unblocks a remote from firing
+-- returns a cancellable object
+------------------------------------------------------------------------
+function Dehash:BlockRemote(name, boolean)
+	local entry = getEntry(name)
+	if not entry then
+		warn("Dehash:BlockRemote - remote not found: " .. tostring(name))
+		return
+	end
+
+	self.BlockedRemotes[name] = boolean and entry or nil
+
+	return {
+		Cancel = function()
+			Dehash.BlockedRemotes[name] = nil
+		end
+	}
+end
+
+------------------------------------------------------------------------
+-- ForceRemote
+-- forces specific arg indexes on a remote
+-- returns a cancellable object
+-- call :ForceRemote(name, args):Cancel() to stop
+------------------------------------------------------------------------
+function Dehash:ForceRemote(name, args)
+	local entry = getEntry(name)
+	if not entry then
+		warn("Dehash:ForceRemote - remote not found: " .. tostring(name))
+		return
+	end
+
+	self.ForcedRemotes[name] = {
+		Remote = entry.Remote,
+		Path   = entry.Path,
+		Class  = entry.Class,
+		args   = args or {},
+		active = true,
+	}
+
+	return {
+		Cancel = function()
+			if Dehash.ForcedRemotes[name] then
+				Dehash.ForcedRemotes[name].active = false
+				Dehash.ForcedRemotes[name] = nil
+			end
+		end
+	}
+end
+
+------------------------------------------------------------------------
+-- GetRemote
+-- returns the remote instance by name, nil if not found or dead
+------------------------------------------------------------------------
 function Dehash:GetRemote(name)
-    return Remotes[name] or nil
+	local entry = getEntry(name)
+	if entry and isValidRemote(entry.Remote) then
+		return entry.Remote
+	end
+	return nil
 end
 
-function Dehash:GetName(remote)
-    return RemoteMap[remote] or nil
-end
-
-function Dehash:HasRemote(name)
-    return Remotes[name] ~= nil
-end
-
-function Dehash:WaitForRemote(name, duration)
-    duration = duration or 10
-    local elapsed = 0
-    while not Remotes[name] and elapsed < duration do
-        task.wait(0.1)
-        elapsed += 0.1
-    end
-    return Remotes[name] or nil
-end
-
-function Dehash:FireRemote(name, argsTable)
-    local remote = Remotes[name]
-    if not remote then
-        warn("Dehash: remote not found ->", name)
-        return
-    end
-    if BlockedRemotes[name] then
-        warn("Dehash:", name, "is blocked")
-        return
-    end
-    local args = {}
-    for index, value in pairs(argsTable) do
-        args[index] = value
-    end
-    if remote:IsA("RemoteEvent") then
-        remote:FireServer(table.unpack(args))
-    elseif remote:IsA("RemoteFunction") then
-        return remote:InvokeServer(table.unpack(args))
-    end
-end
-
-function Dehash:BlockRemote(name, enabled)
-    BlockedRemotes[name] = enabled
-end
-
-function Dehash:GetBlockedRemotes()
-    local copy = {}
-    for name, state in pairs(BlockedRemotes) do
-        if state then table.insert(copy, name) end
-    end
-    return copy
-end
-
-function Dehash:ForceRemote(name, enabled, argsTable)
-    if not Remotes[name] then
-        warn("Dehash: remote not found ->", name)
-        return
-    end
-    if not enabled then
-        ForcedRemotes[name] = nil
-        return
-    end
-    ForcedRemotes[name] = {
-        args = argsTable or {},
-        keepForcing = enabled
-    }
-end
-
-function Dehash:GetForcedRemotes()
-    local copy = {}
-    for name, data in pairs(ForcedRemotes) do
-        copy[name] = data
-    end
-    return copy
-end
-
+------------------------------------------------------------------------
+-- SpyRemote
+-- spies on a remote, callback receives args table or nil
+-- returns a cancellable object
+------------------------------------------------------------------------
 function Dehash:SpyRemote(name, callback)
-    if not Remotes[name] then
-        warn("Dehash: remote not found ->", name)
-        return
-    end
-    local remote = Remotes[name]
-    local active = true
+	local entry = getEntry(name)
+	if not entry then
+		warn("Dehash:SpyRemote - remote not found: " .. tostring(name))
+		return
+	end
 
-    local spyNamecall
-    spyNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if active and self == remote and (method == "FireServer" or method == "InvokeServer") then
-            local args = {...}
-            if BlockedRemotes[name] then return end
-            callback(#args > 0 and args or nil)
-            if ForcedRemotes[name] then
-                local forceData = ForcedRemotes[name]
-                for index, value in pairs(forceData.args) do
-                    args[index] = value
-                end
-                return spyNamecall(self, table.unpack(args))
-            end
-        end
-        return spyNamecall(self, ...)
-    end))
+	self.SpiedRemotes[name] = {
+		Remote   = entry.Remote,
+		Path     = entry.Path,
+		Class    = entry.Class,
+		callback = callback,
+		active   = true,
+	}
 
-    return {
-        Cancel = function()
-            active = false
-            restorefunction(spyNamecall)
-        end,
-        IsActive = function()
-            return active
-        end
-    }
+	return {
+		Cancel = function()
+			if Dehash.SpiedRemotes[name] then
+				Dehash.SpiedRemotes[name].active = false
+				Dehash.SpiedRemotes[name] = nil
+			end
+		end,
+		IsActive = function()
+			return Dehash.SpiedRemotes[name] ~= nil
+				and Dehash.SpiedRemotes[name].active == true
+		end
+	}
 end
 
-function Dehash:OnClientEvent(name, callback)
-    local remote = Remotes[name]
-    if not remote then
-        warn("Dehash: remote not found ->", name)
-        return
-    end
-    if not remote:IsA("RemoteEvent") then
-        warn("Dehash:", name, "is not a RemoteEvent")
-        return
-    end
-    remote.OnClientEvent:Connect(function(...)
-        if BlockedRemotes[name] then return end
-        callback(...)
-    end)
+------------------------------------------------------------------------
+-- OnRemoteCall
+-- fires callback whenever the game fires this remote
+-- callback receives no args, use SpyRemote if you need args
+-- returns a cancellable object
+------------------------------------------------------------------------
+function Dehash:OnRemoteCall(name, callback)
+	local entry = getEntry(name)
+	if not entry then
+		warn("Dehash:OnRemoteCall - remote not found: " .. tostring(name))
+		return
+	end
+
+	self.OnCallRemotes[name] = {
+		Remote   = entry.Remote,
+		Path     = entry.Path,
+		Class    = entry.Class,
+		callback = callback,
+		active   = true,
+	}
+
+	return {
+		Cancel = function()
+			if Dehash.OnCallRemotes[name] then
+				Dehash.OnCallRemotes[name].active = false
+				Dehash.OnCallRemotes[name] = nil
+			end
+		end,
+		IsActive = function()
+			return Dehash.OnCallRemotes[name] ~= nil
+				and Dehash.OnCallRemotes[name].active == true
+		end
+	}
 end
 
-function Dehash:SetSearchStorage(storageTable)
-    SearchStorage = storageTable
-    scanStorage()
+------------------------------------------------------------------------
+-- STATE CHECKS
+------------------------------------------------------------------------
+function Dehash:IsBlocked(name)
+	return self.BlockedRemotes[name] ~= nil
 end
+
+function Dehash:IsForced(name)
+	return self.ForcedRemotes[name] ~= nil
+		and self.ForcedRemotes[name].active == true
+end
+
+function Dehash:IsSpied(name)
+	return self.SpiedRemotes[name] ~= nil
+		and self.SpiedRemotes[name].active == true
+end
+
+------------------------------------------------------------------------
+-- INFO
+------------------------------------------------------------------------
+function Dehash:GetRemotePath(name)
+	local entry = getEntry(name)
+	return entry and entry.Path or nil
+end
+
+function Dehash:GetRemoteClass(name)
+	local entry = getEntry(name)
+	return entry and entry.Class or nil
+end
+
+function Dehash:Destroy()
+	-- disconnect the namecall hook by restoring the original
+	pcall(function()
+		restorefunction(originalNamecall)
+	end)
+
+	-- cancel all active spies
+	for name, entry in pairs(self.SpiedRemotes) do
+		if entry.active then
+			entry.active = false
+		end
+	end
+
+	-- cancel all active onCall listeners
+	for name, entry in pairs(self.OnCallRemotes) do
+		if entry.active then
+			entry.active = false
+		end
+	end
+
+	-- cancel all active forces
+	for name, entry in pairs(self.ForcedRemotes) do
+		if entry.active then
+			entry.active = false
+		end
+	end
+
+	-- clear all caches
+	table.clear(self.StoredRemotes)
+	table.clear(self.ForcedRemotes)
+	table.clear(self.BlockedRemotes)
+	table.clear(self.SpiedRemotes)
+	table.clear(self.OnCallRemotes)
+
+	-- remove from genv so it can't be reused
+	getgenv().__DehashLoaded = nil
+	getgenv().Dehash = nil
+
+	print("Dehash: destroyed successfully")
+end
+
+print("Operating for:", game.PlaceId, "At:"..os.time())
 
 getgenv().Dehash = Dehash
 return Dehash
