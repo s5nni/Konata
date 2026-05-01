@@ -3,12 +3,11 @@ if getgenv().__RemoteMapper then
 end
 getgenv().__RemoteMapper = true
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteMap = {}
 local Remotes = {}
 local BlockedRemotes = {}
 local ForcedRemotes = {}
-local fullSearchEnabled = false
+local SearchStorage = {game:GetService("ReplicatedStorage")}
 
 local function register(remote, realName)
     if not (remote and remote.Parent) then return end
@@ -30,73 +29,34 @@ local function scanGC()
     end
 end
 
-local function scanReplicatedStorage()
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            register(obj, RemoteMap[obj] or obj.Name)
-        end
-    end
-    ReplicatedStorage.DescendantAdded:Connect(function(obj)
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            task.spawn(function()
-                local timeout = tick() + 5
-                while obj.Parent and tick() < timeout do
-                    local realName = RemoteMap[obj]
-                    if realName then
-                        register(obj, realName)
-                        return
-                    end
-                    task.wait(0.1)
-                end
-                if obj and obj.Parent then
-                    register(obj, obj.Name)
-                end
-            end)
-        end
-    end)
-end
-
-local function scanEverything()
-    for _, service in ipairs(game:GetChildren()) do
+local function scanStorage()
+    for _, storage in ipairs(SearchStorage) do
         pcall(function()
-            for _, obj in ipairs(service:GetDescendants()) do
+            for _, obj in ipairs(storage:GetDescendants()) do
                 if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
                     register(obj, RemoteMap[obj] or obj.Name)
                 end
             end
-        end)
-    end
-    for _, obj in ipairs(getnilinstances()) do
-        pcall(function()
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                register(obj, RemoteMap[obj] or obj.Name)
-            end
-        end)
-    end
-    scanGC()
-end
-
-local function watchFolder(folder)
-    for _, obj in ipairs(folder:GetChildren()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local realName = RemoteMap[obj]
-            if realName then register(obj, realName) end
-        end
-    end
-    folder.ChildAdded:Connect(function(child)
-        if not (child:IsA("RemoteEvent") or child:IsA("RemoteFunction")) then return end
-        task.spawn(function()
-            local timeout = tick() + 5
-            while child.Parent and tick() < timeout do
-                local realName = RemoteMap[child]
-                if realName then
-                    register(child, realName)
-                    return
+            storage.DescendantAdded:Connect(function(obj)
+                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                    task.spawn(function()
+                        local timeout = tick() + 5
+                        while obj.Parent and tick() < timeout do
+                            local realName = RemoteMap[obj]
+                            if realName then
+                                register(obj, realName)
+                                return
+                            end
+                            task.wait(0.1)
+                        end
+                        if obj and obj.Parent then
+                            register(obj, obj.Name)
+                        end
+                    end)
                 end
-                task.wait(0.1)
-            end
+            end)
         end)
-    end)
+    end
 end
 
 do
@@ -115,10 +75,33 @@ do
     setreadonly(mt, true)
 end
 
+local originalNamecall
+originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "FireServer" or method == "InvokeServer" then
+        local realName = RemoteMap[self] or self.Name
+
+        if BlockedRemotes[realName] then
+            return
+        end
+
+        local args = {...}
+
+        if ForcedRemotes[realName] then
+            local forceData = ForcedRemotes[realName]
+            for index, value in pairs(forceData.args) do
+                args[index] = value
+            end
+            return originalNamecall(self, table.unpack(args))
+        end
+    end
+    return originalNamecall(self, ...)
+end))
+
 task.spawn(function()
     task.wait(2)
     scanGC()
-    scanReplicatedStorage()
+    scanStorage()
 end)
 
 task.spawn(function()
@@ -130,14 +113,6 @@ end)
 
 local Dehash = {}
 
-function Dehash:GetRemote(name)
-    return Remotes[name] or nil
-end
-
-function Dehash:GetName(remote)
-    return RemoteMap[remote] or nil
-end
-
 function Dehash:GetRemotes()
     local copy = {}
     for name, remote in pairs(Remotes) do
@@ -146,47 +121,41 @@ function Dehash:GetRemotes()
     return copy
 end
 
+function Dehash:GetRemote(name)
+    return Remotes[name] or nil
+end
+
+function Dehash:GetName(remote)
+    return RemoteMap[remote] or nil
+end
+
 function Dehash:HasRemote(name)
     return Remotes[name] ~= nil
 end
 
-function Dehash:WaitForRemote(name, timeout)
-    timeout = timeout or 10
+function Dehash:WaitForRemote(name, duration)
+    duration = duration or 10
     local elapsed = 0
-    while not Remotes[name] and elapsed < timeout do
+    while not Remotes[name] and elapsed < duration do
         task.wait(0.1)
         elapsed += 0.1
     end
     return Remotes[name] or nil
 end
 
-function Dehash:PrintAll()
-    print("=== Dehash Remote Map ===")
-    local count = 0
-    for name, remote in pairs(Remotes) do
-        print("  Name:", name, "| Path:", remote:GetFullName(), "| Type:", remote.ClassName)
-        count += 1
-    end
-    print("  Total:", count, "remotes found")
-end
-
-function Dehash:FireRemote(name, ...)
+function Dehash:FireRemote(name, argsTable)
     local remote = Remotes[name]
     if not remote then
         warn("Dehash: remote not found ->", name)
         return
     end
     if BlockedRemotes[name] then
-        print("Dehash:", name, "is blocked, not firing")
+        warn("Dehash:", name, "is blocked")
         return
     end
-    local args = {...}
-    if ForcedRemotes[name] then
-        local forceData = ForcedRemotes[name]
-        args = forceData.args
-        if not forceData.keepForcing then
-            ForcedRemotes[name] = nil
-        end
+    local args = {}
+    for index, value in pairs(argsTable) do
+        args[index] = value
     end
     if remote:IsA("RemoteEvent") then
         remote:FireServer(table.unpack(args))
@@ -195,20 +164,8 @@ function Dehash:FireRemote(name, ...)
     end
 end
 
-function Dehash:OnClientEvent(name, callback)
-    local remote = Remotes[name]
-    if not remote then
-        warn("Dehash: remote not found ->", name)
-        return
-    end
-    if remote:IsA("RemoteEvent") then
-        return remote.OnClientEvent:Connect(callback)
-    end
-end
-
 function Dehash:BlockRemote(name, enabled)
     BlockedRemotes[name] = enabled
-    print("Dehash:", name, enabled and "blocked" or "unblocked")
 end
 
 function Dehash:GetBlockedRemotes()
@@ -219,21 +176,19 @@ function Dehash:GetBlockedRemotes()
     return copy
 end
 
-function Dehash:ForceRemote(name, args, keepForcing)
+function Dehash:ForceRemote(name, enabled, argsTable)
     if not Remotes[name] then
         warn("Dehash: remote not found ->", name)
         return
     end
+    if not enabled then
+        ForcedRemotes[name] = nil
+        return
+    end
     ForcedRemotes[name] = {
-        args = args,
-        keepForcing = keepForcing
+        args = argsTable or {},
+        keepForcing = enabled
     }
-    print("Dehash:", name, "arguments are now forced")
-end
-
-function Dehash:UnforceRemote(name)
-    ForcedRemotes[name] = nil
-    print("Dehash:", name, "force removed")
 end
 
 function Dehash:GetForcedRemotes()
@@ -245,68 +200,61 @@ function Dehash:GetForcedRemotes()
 end
 
 function Dehash:SpyRemote(name, callback)
+    if not Remotes[name] then
+        warn("Dehash: remote not found ->", name)
+        return
+    end
+    local remote = Remotes[name]
+    local active = true
+
+    local spyNamecall
+    spyNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if active and self == remote and (method == "FireServer" or method == "InvokeServer") then
+            local args = {...}
+            if BlockedRemotes[name] then return end
+            callback(#args > 0 and args or nil)
+            if ForcedRemotes[name] then
+                local forceData = ForcedRemotes[name]
+                for index, value in pairs(forceData.args) do
+                    args[index] = value
+                end
+                return spyNamecall(self, table.unpack(args))
+            end
+        end
+        return spyNamecall(self, ...)
+    end))
+
+    return {
+        Cancel = function()
+            active = false
+            restorefunction(spyNamecall)
+        end,
+        IsActive = function()
+            return active
+        end
+    }
+end
+
+function Dehash:OnClientEvent(name, callback)
     local remote = Remotes[name]
     if not remote then
         warn("Dehash: remote not found ->", name)
         return
     end
-    local originalNamecall
-    originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if self == remote and (method == "FireServer" or method == "InvokeServer") then
-            local args = {...}
-            callback(name, args)
-            if BlockedRemotes[name] then return end
-            if ForcedRemotes[name] then
-                local forceData = ForcedRemotes[name]
-                if not forceData.keepForcing then ForcedRemotes[name] = nil end
-                return originalNamecall(self, table.unpack(forceData.args))
-            end
-        end
-        return originalNamecall(self, ...)
-    end))
-end
-
-function Dehash:SpyAll()
-    local originalNamecall
-    originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if method == "FireServer" or method == "InvokeServer" then
-            local realName = RemoteMap[self] or self.Name
-            local args = {...}
-            if BlockedRemotes[realName] then
-                print("Dehash [BLOCKED]:", realName)
-                return
-            end
-            if ForcedRemotes[realName] then
-                local forceData = ForcedRemotes[realName]
-                print("Dehash [FORCED]:", realName, "->", table.unpack(forceData.args))
-                if not forceData.keepForcing then ForcedRemotes[realName] = nil end
-                return originalNamecall(self, table.unpack(forceData.args))
-            end
-            print("Dehash [FIRED]:", realName, "| Args:", table.unpack(args))
-        end
-        return originalNamecall(self, ...)
-    end))
-    print("Dehash: spying on all remotes")
-end
-
-function Dehash:AllowFullSearch(enabled)
-    fullSearchEnabled = enabled
-    print("Dehash: full search", enabled and "enabled" or "disabled")
-    self:Rescan()
-end
-
-function Dehash:Rescan()
-    scanGC()
-    if fullSearchEnabled then
-        scanEverything()
-    else
-        scanReplicatedStorage()
+    if not remote:IsA("RemoteEvent") then
+        warn("Dehash:", name, "is not a RemoteEvent")
+        return
     end
-    local count = 0
-    for _ in pairs(Remotes) do count += 1 end
-    print("Dehash: rescan complete, found", count, "remotes")
+    remote.OnClientEvent:Connect(function(...)
+        if BlockedRemotes[name] then return end
+        callback(...)
+    end)
+end
+
+function Dehash:SetSearchStorage(storageTable)
+    SearchStorage = storageTable
+    scanStorage()
 end
 
 getgenv().Dehash = Dehash
