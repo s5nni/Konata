@@ -66,6 +66,7 @@ local UserExists = getgenv().__Mitulib.Database:Exists("Users")
 if UserExists == false then getgenv().__Mitulib.Reason = "Not provided." return end
 
 local canAcess = false
+local accessState = "w"
 Authentication = getgenv().__Mitulib.Source:AddAuthentication({
 	Key = placeData.Settings.Key,
 	Method = "Key",
@@ -93,7 +94,14 @@ Authentication:OnSubmit(function()
 	end
 end)
 
-repeat task.wait(1) until canAcess == true
+Authentication:OnClose(function()
+	getgenv().__Mitulib.Reason = "Authentication Cancelled, Rejoin."
+	accessState = "c"
+	Authentication:Close()
+	return
+end)
+
+repeat task.wait(1) if accessState == "c" then print("Giving up.") return end until canAcess == true
 
 local Encoded = getgenv().__Mitulib.Encode.Encode(placeData.Settings.Key, placeData.Settings.Seed)
 
