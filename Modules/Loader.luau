@@ -31,7 +31,7 @@ if getgenv().__Mitulib.Database == nil then
 end
 
 local Varargs = ...
-if Varargs ~= nil and type(Varargs) == "string" then
+if Varargs ~= nil and type(Varargs) == "string" and Varargs ~= "" then
 	-- Load required modules if not already loaded
 	if getgenv().__Mitulib.Encode == nil then
 		getgenv().__Mitulib.Encode = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Encode.luau", false))()
