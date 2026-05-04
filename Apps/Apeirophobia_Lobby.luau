@@ -22,7 +22,7 @@ end
 if placeData == nil then error("Failure: 2") return end
 
 -- Decode Key
-local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Place.Seed)
+local newKey = getgenv().__Mitulib.Encode.Decode(keyVararg, placeData.Settings.Seed)
 if newKey ~= placeData.Settings.Key then print(newKey, placeData.Settings.Key) error("Failure: 3") return end
 ---------------------------------------------------
 
