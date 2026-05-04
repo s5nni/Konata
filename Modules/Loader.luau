@@ -9,6 +9,7 @@ if getgenv().__MituRunning == true then
 	})
 	return
 end
+
 getgenv().__MituRunning = true
 getgenv().__Mitulib = {}
 getgenv().__Mitulib.Reason = "Not provided."
@@ -27,6 +28,51 @@ if getgenv().__Mitulib.Database == nil then
 		Url    = "https://mitu-gg-default-rtdb.firebaseio.com",
 		Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX",
 	})
+end
+
+local Varargs = ...
+if Varargs ~= nil and type(Varargs) == "string" then
+	-- Load required modules if not already loaded
+	if getgenv().__Mitulib.Encode == nil then
+		getgenv().__Mitulib.Encode = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Encode.luau", false))()
+	end
+	if getgenv().__Mitulib.Database == nil then
+		local DatabaseLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/s5nni/Konata/refs/heads/main/Modules/Database.luau", false))()
+		getgenv().__Mitulib.Database = DatabaseLib:New({
+			Url    = "https://mitu-gg-default-rtdb.firebaseio.com",
+			Secret = "yRMlT8NNgrOOl5WUIxANgIwzralo2n9hGUkFDuoX",
+		})
+	end
+
+	-- Collect Apps Data
+	local AppsExists = getgenv().__Mitulib.Database:Exists("Apps")
+	if AppsExists == false then return end
+	local Apps = getgenv().__Mitulib.Database:Get("Apps")
+	local Settings = getgenv().__Mitulib.Database:Get("Settings")
+
+	-- Search for matching place ID
+	local placeData = nil
+	for ID, Data in next, Apps do
+		if game.PlaceId == tonumber(ID) then
+			placeData = Data
+			break
+		end
+	end
+
+	if placeData == nil then return end
+	if placeData.Settings.AllowExecution == false then return end
+
+	-- Decode the provided vararg and validate against the database key
+	local ok, decoded = pcall(getgenv().__Mitulib.Encode.Decode, Varargs, placeData.Settings.Seed)
+	if not ok then return end
+	if decoded ~= placeData.Settings.Key then return end
+
+	-- Valid — skip auth and launch directly
+	getgenv().__MituRunning = true
+	getgenv().__Mitulib._PassKey = Varargs
+	local scriptUrl = Settings.AppsPath..placeData.Place.Type..".luau"
+	loadstring(game:HttpGet(scriptUrl, false))(Varargs)
+	return
 end
 
 -- Checks and fire Settings Data
